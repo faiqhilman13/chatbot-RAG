@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60">
+  <!-- Light bulb icon -->
+  <path d="M26 5c-8.284 0-15 6.716-15 15 0 5.25 2.75 9.5 7 12v8c0 2.5 1.5 4 4 4h8c2.5 0 4-1.5 4-4v-8c4.25-2.5 7-6.75 7-12 0-8.284-6.716-15-15-15z" fill="#E31837"/>
+  <path d="M26 50v5c0 2.5 1.5 4 4 4h8c2.5 0 4-1.5 4-4v-5H26z" fill="#E31837"/>
+  <path d="M22 32h8v8h-8z" fill="#FFFFFF"/>
+  <!-- Lightning bolt -->
+  <path d="M29 5l-12 16h10l-6 14 18-18h-10l7-12z" fill="#FFFFFF"/>
+
+  <!-- TENAGA NASIONAL text -->
+  <path d="M55 15h40v5h-17v25h-6V20H55z" fill="#0055A4"/>
+  <path d="M95 15h6v30h-6z" fill="#0055A4"/>
+  <path d="M105 15h6l10 20 10-20h6v30h-6V23l-10 20-10-20v22h-6z" fill="#0055A4"/>
+  <path d="M145 15h6l15 30h-7l-3-6h-16l-3 6h-7zm3 18h10l-5-10z" fill="#0055A4"/>
+  <path d="M165 15h8l15 22V15h6v30h-8l-15-22v22h-6z" fill="#0055A4"/>
+  
+  <!-- Better Brighter text path -->
+  <path d="M70 55h3c1.5 0 2.5 1 2.5 2.5s-1 2.5-2.5 2.5h-2v3h-1v-8zm1 4h2c1 0 1.5-0.5 1.5-1.5s-0.5-1.5-1.5-1.5h-2v3z" fill="#E31837"/>
+  <path d="M78 55h4.5v1h-3.5v2.5h3v1h-3v2.5h3.5v1h-4.5v-8z" fill="#E31837"/>
+  <path d="M85 55h1v7h3.5v1h-4.5v-8z" fill="#E31837"/>
+  <path d="M91 55h1v7h3.5v1h-4.5v-8z" fill="#E31837"/>
+  <path d="M98 55h4.5v1h-3.5v2.5h3v1h-3v2.5h3.5v1h-4.5v-8z" fill="#E31837"/>
+  <path d="M105 55h1v8h-1v-8z" fill="#E31837"/>
+  <path d="M112 55h1l3 8h-1.2l-0.8-2h-3l-0.8 2h-1.2l3-8zm-0.5 5h2l-1-3-1 3z" fill="#E31837"/>
+  <path d="M119 63h-1v-8h1l4 6v-6h1v8h-1l-4-6v6z" fill="#E31837"/>
+</svg> 

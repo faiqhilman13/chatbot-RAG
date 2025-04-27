@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-white text-gray-900 transition-colors duration-200;
+}
+
+.dark body {
+  @apply bg-dark-bg-primary text-dark-text-primary;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-tnb-red text-white py-2 px-4 rounded hover:bg-red-700 transition duration-200;
+  }
+  
+  .btn-secondary {
+    @apply bg-tnb-blue text-white py-2 px-4 rounded hover:bg-blue-700 transition duration-200;
+  }
+
+  /* Dark mode card styles */
+  .dark .card {
+    @apply bg-dark-bg-secondary border-dark-border;
+  }
+
+  /* Dark mode text styles */
+  .dark .text-primary {
+    @apply text-dark-text-primary;
+  }
+
+  .dark .text-secondary {
+    @apply text-dark-text-secondary;
+  }
+
+  /* Dark mode border styles */
+  .dark .border-light {
+    @apply border-dark-border;
+  }
+} 

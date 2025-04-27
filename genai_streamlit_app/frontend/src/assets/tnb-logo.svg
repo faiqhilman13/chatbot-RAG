@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 70" width="200" height="70">
+  <!-- Light bulb icon -->
+  <path d="M26 10c-8.284 0-15 6.716-15 15 0 5.25 2.75 9.5 7 12v8c0 2.5 1.5 4 4 4h8c2.5 0 4-1.5 4-4v-8c4.25-2.5 7-6.75 7-12 0-8.284-6.716-15-15-15z" fill="#E31837"/>
+  <path d="M26 55v5c0 2.5 1.5 4 4 4h8c2.5 0 4-1.5 4-4v-5H26z" fill="#E31837"/>
+  <path d="M22 37h8v8h-8z" fill="#FFFFFF"/>
+  <!-- Lightning bolt -->
+  <path d="M29 10l-12 16h10l-6 14 18-18h-10l7-12z" fill="#FFFFFF"/>
+
+  <!-- TENAGA NASIONAL text -->
+  <path d="M55 20h40v5h-17v25h-6V25H55z" fill="#0055A4"/>
+  <path d="M95 20h6v30h-6z" fill="#0055A4"/>
+  <path d="M105 20h6l10 20 10-20h6v30h-6V28l-10 20-10-20v22h-6z" fill="#0055A4"/>
+  <path d="M145 20h6l15 30h-7l-3-6h-16l-3 6h-7zm3 18h10l-5-10z" fill="#0055A4"/>
+  <path d="M165 20h8l15 22V20h6v30h-8l-15-22v22h-6z" fill="#0055A4"/>
+  <path d="M200 20h6l15 30h-7l-3-6h-16l-3 6h-7zm3 18h10l-5-10z" fill="#0055A4"/>
+
+  <!-- Better Brighter text -->
+  <text x="85" y="65" font-family="Arial" font-size="14" fill="#E31837" font-style="italic" font-weight="bold">Better. Brighter.</text>
+</svg> 
