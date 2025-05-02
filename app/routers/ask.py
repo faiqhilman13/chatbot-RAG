@@ -38,8 +38,21 @@ async def ask_question(request: QuestionRequest):
         
         rag_retriever.build_vectorstore(docs)
     
-    # Retrieve context
-    context, sources = rag_retriever.retrieve_context(question)
+    # Get the most recent document filename if there are any documents
+    from app.main import document_store
+    
+    most_recent_filename = None
+    if document_store:
+        # Get the most recent document ID (assuming the latest added is the one we want)
+        most_recent_doc = list(document_store.values())[-1]
+        most_recent_filename = most_recent_doc.get("filename")
+        print(f"[INFO] Using most recent document: {most_recent_filename}")
+    
+    # Retrieve context, filtered by the most recent document if available
+    context, sources = rag_retriever.retrieve_context(
+        question=question,
+        source_filter=most_recent_filename
+    )
     
     if not context:
         return {

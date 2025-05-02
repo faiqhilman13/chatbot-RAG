@@ -390,10 +390,28 @@ async def upload_document(file: UploadFile = File(...), title: str = Form(...)):
     
     # Process the document
     try:
+        # Clear existing vector store to ensure we only use this document
+        from pathlib import Path
+        vector_store_dir = Path(VECTORSTORE_DIR)
+        for file_name in ["index.faiss", "index.pkl"]:
+            path = vector_store_dir / file_name
+            if path.exists():
+                path.unlink()
+                print(f"[INFO] Removed old vector store file: {path}")
+        print("[INFO] Old vector store cleared.")
+        
         # Process the document and add to vectorstore
         print(f"Processing document: {file_location}")
         docs = prepare_documents(file_location)
         print(f"Document processed: {len(docs) if docs else 0} chunks created")
+        
+        # Add source metadata to each document chunk
+        for doc in docs:
+            doc.metadata["source"] = file.filename
+            doc.metadata["document_id"] = doc_id
+            doc.metadata["title"] = title
+            
+        print(f"Added document metadata to chunks. Source: {file.filename}")
         
         # Store document metadata
         file_size = os.path.getsize(file_location)
@@ -409,22 +427,11 @@ async def upload_document(file: UploadFile = File(...), title: str = Form(...)):
         }
         print(f"Document metadata stored: {document_store[doc_id]}")
         
-        # Add to vectorstore
+        # Build vectorstore with the new documents
         if docs:
-            # Ensure vectorstore is loaded
-            print("Loading vectorstore")
-            vectorstore_loaded = rag_retriever.load_vectorstore()
-            print(f"Vectorstore loaded: {vectorstore_loaded}")
-            
-            if not vectorstore_loaded:
-                print("Building new vectorstore")
-                rag_retriever.build_vectorstore(docs)
-            else:
-                # Add to existing vectorstore
-                print("Adding documents to existing vectorstore")
-                rag_retriever.vectorstore.add_documents(docs)
-                print("Saving vectorstore")
-                rag_retriever.save_vectorstore()
+            print("Building new vectorstore with current document only")
+            rag_retriever.build_vectorstore(docs)
+            print("Vector store built successfully")
         
         return {
             "id": doc_id,

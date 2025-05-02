@@ -70,8 +70,14 @@ class RAGRetriever:
             print(f"Error saving vectorstore: {str(e)}")
             return False
     
-    def retrieve_context(self, question: str, k: int = None) -> Tuple[str, List[str]]:
-        """Retrieve context for a question"""
+    def retrieve_context(self, question: str, k: int = None, source_filter: str = None) -> Tuple[str, List[str]]:
+        """Retrieve context for a question, optionally filtered by source document
+        
+        Args:
+            question: The question to retrieve context for
+            k: Number of documents to retrieve
+            source_filter: Only include documents from this source/filename
+        """
         if not self.vectorstore:
             if not self.load_vectorstore():
                 return "", []
@@ -85,6 +91,20 @@ class RAGRetriever:
                 search_kwargs={"k": k}
             )
             docs = retriever.get_relevant_documents(question)
+            
+            # Print retrieved sources for debugging
+            sources_set = {doc.metadata.get("source", "unknown") for doc in docs}
+            print(f"[RETRIEVED SOURCES] {sources_set}")
+            
+            # Filter by source if specified
+            if source_filter:
+                print(f"[INFO] Filtering retrieved documents by source: {source_filter}")
+                filtered_docs = [doc for doc in docs if doc.metadata.get("source") == source_filter]
+                if not filtered_docs:
+                    print(f"[WARNING] No documents matched source filter '{source_filter}'. Using all documents.")
+                else:
+                    print(f"[INFO] Filtered from {len(docs)} to {len(filtered_docs)} documents")
+                    docs = filtered_docs
             
             context = "\n\n".join([doc.page_content for doc in docs])
             sources = []
