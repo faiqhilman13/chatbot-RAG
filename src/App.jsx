@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import HomePage from './pages/HomePage';
+import ChatPage from './pages/ChatPage';
 import SummarizationBot from './pages/SummarizationBot';
 import VisualizationBot from './pages/VisualizationBot';
 import ExtractionBot from './pages/ExtractionBot';
@@ -15,6 +16,7 @@ function App() {
     <Routes>
       <Route path="/" element={<MainLayout />}>
         <Route index element={<HomePage />} />
+        <Route path="chat" element={<ChatPage />} />
         <Route path="summarization" element={<SummarizationBot />} />
         <Route path="visualization" element={<VisualizationBot />} />
         <Route path="extraction" element={<ExtractionBot />} />
