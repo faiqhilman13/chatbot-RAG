@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4a6fa5;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #355582;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .status {
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .online {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .offline {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chatbot API Test</h1>
+    
+    <div class="container">
+        <h2>Health Check</h2>
+        <button id="healthBtn">Test Health Endpoint</button>
+        <div id="healthStatus" class="status">Checking...</div>
+        <pre id="healthResponse"></pre>
+    </div>
+    
+    <div class="container">
+        <h2>Chat Endpoint</h2>
+        <input type="text" id="questionInput" placeholder="Enter your question" value="What is a hybrid chatbot system?" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+        <button id="askBtn">Send Question</button>
+        <div id="chatStatus" class="status">Sending...</div>
+        <pre id="chatResponse"></pre>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_URL = 'http://localhost:8000';
+        const API_ENDPOINTS = {
+            health: `${API_URL}/health`,
+            ask: `${API_URL}/api/v1/ask`
+        };
+
+        document.getElementById('healthBtn').addEventListener('click', function() {
+            const statusEl = document.getElementById('healthStatus');
+            const responseEl = document.getElementById('healthResponse');
+            
+            statusEl.textContent = 'Checking...';
+            statusEl.className = 'status';
+            responseEl.textContent = '';
+            
+            // Using XMLHttpRequest
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', API_ENDPOINTS.health);
+            
+            xhr.onload = function() {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    statusEl.textContent = 'Online';
+                    statusEl.className = 'status online';
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        responseEl.textContent = JSON.stringify(data, null, 2);
+                    } catch (error) {
+                        responseEl.textContent = xhr.responseText;
+                    }
+                } else {
+                    statusEl.textContent = 'Offline';
+                    statusEl.className = 'status offline';
+                    responseEl.textContent = 'API Status check failed with status: ' + xhr.status + ' ' + xhr.statusText + ' ' + xhr.responseText;
+                }
+            };
+            
+            xhr.onerror = function() {
+                statusEl.textContent = 'Network Error!';
+                statusEl.className = 'status error';
+                responseEl.textContent = 'Could not connect to the API server. Check if it\'s running.';
+            };
+            
+            xhr.send();
+        });
+        
+        document.getElementById('askBtn').addEventListener('click', function() {
+            const question = document.getElementById('questionInput').value.trim();
+            if (!question) return;
+            
+            const statusEl = document.getElementById('chatStatus');
+            const responseEl = document.getElementById('chatResponse');
+            
+            statusEl.textContent = 'Sending...';
+            statusEl.className = 'status';
+            responseEl.textContent = '';
+            
+            // Using XMLHttpRequest
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', API_ENDPOINTS.ask);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            
+            xhr.onload = function() {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        statusEl.textContent = 'Success!';
+                        statusEl.className = 'status success';
+                        responseEl.textContent = JSON.stringify(data, null, 2);
+                    } catch (error) {
+                        statusEl.textContent = 'Error!';
+                        statusEl.className = 'status error';
+                        responseEl.textContent = 'Failed to parse server response';
+                    }
+                } else {
+                    statusEl.textContent = 'Error!';
+                    statusEl.className = 'status error';
+                    responseEl.textContent = 'API error (' + xhr.status + '): ' + xhr.statusText + ' ' + xhr.responseText;
+                }
+            };
+            
+            xhr.onerror = function() {
+                statusEl.textContent = 'Network Error!';
+                statusEl.className = 'status error';
+                responseEl.textContent = 'Could not connect to the API server. Check if it\'s running.';
+            };
+            
+            xhr.send(JSON.stringify({ question: question }));
+        });
+    </script>
+</body>
+</html> 

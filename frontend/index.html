@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internal AI Chatbot</title>
+    <link rel="stylesheet" href="./static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Internal AI Chatbot</h1>
+            <p>Hybrid Knowledge Graph + RAG System</p>
+            <button id="test-api-btn" class="test-btn">Test API Connection</button>
+        </header>
+
+        <main class="chat-container">
+            <div class="chat-messages" id="chat-messages">
+                <div class="message system">
+                    <div class="message-content">
+                        <p>Welcome to the Internal AI Chatbot! How can I help you today?</p>
+                    </div>
+                </div>
+                <!-- Messages will be added here dynamically -->
+            </div>
+
+            <div class="chat-input-container">
+                <form id="chat-form">
+                    <input 
+                        type="text" 
+                        id="user-input" 
+                        placeholder="Type your message here..." 
+                        autocomplete="off" 
+                        required
+                    >
+                    <button type="submit" id="send-button">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </form>
+            </div>
+        </main>
+
+        <footer>
+            <p>API Status: <span id="api-status">Checking...</span></p>
+        </footer>
+    </div>
+
+    <div class="source-panel" id="source-panel">
+        <div class="source-panel-header">
+            <h3>Sources</h3>
+            <button class="close-panel" id="close-panel">&times;</button>
+        </div>
+        <div class="source-panel-content" id="source-content">
+            <!-- Sources will be added here -->
+        </div>
+    </div>
+
+    <script src="./static/script.js"></script>
+</body>
+</html> 

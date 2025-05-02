@@ -1,5 +1,6 @@
 from langchain_community.vectorstores import FAISS
 from app.config import EMBEDDING_MODEL, VECTORSTORE_DIR, RETRIEVAL_K
+from app.utils.entity_extractor import extract_named_entities
 import os
 import pickle
 from typing import List, Tuple, Optional, Dict, Any
@@ -71,7 +72,16 @@ class RAGRetriever:
             return False
     
     def retrieve_context(self, question: str, k: int = None) -> Tuple[str, List[str]]:
-        """Retrieve context for a question"""
+        """
+        Retrieve context for a question, with entity filtering
+        
+        Args:
+            question (str): The question to retrieve context for
+            k (int, optional): Number of documents to retrieve
+            
+        Returns:
+            Tuple[str, List[str]]: Retrieved context and list of source documents
+        """
         if not self.vectorstore:
             if not self.load_vectorstore():
                 return "", []
@@ -80,22 +90,50 @@ class RAGRetriever:
             k = RETRIEVAL_K
             
         try:
+            # Extract named entities from question
+            entities = extract_named_entities(question)
+            
+            # Get more documents than needed for filtering
             retriever = self.vectorstore.as_retriever(
                 search_type="similarity", 
-                search_kwargs={"k": k}
+                search_kwargs={"k": k * 2}  # Get more docs for filtering
             )
             docs = retriever.get_relevant_documents(question)
             
-            context = "\n\n".join([doc.page_content for doc in docs])
+            if entities:
+                # Filter docs that contain any of the entities
+                filtered_docs = []
+                entities_lower = [e.lower() for e in entities]
+                
+                for doc in docs:
+                    content_lower = doc.page_content.lower()
+                    if any(entity in content_lower for entity in entities_lower):
+                        filtered_docs.append(doc)
+                
+                # Use filtered docs if any match, otherwise fall back to original
+                if filtered_docs:
+                    docs = filtered_docs[:k]
+                else:
+                    docs = docs[:k]
+            else:
+                # No entities found, use top k docs
+                docs = docs[:k]
+            
+            # Format context with source attribution
+            context_parts = []
             sources = []
             
-            # Extract unique sources
             for doc in docs:
                 source = doc.metadata.get("source", "unknown")
+                content = doc.page_content.strip()
+                context_parts.append(f"[From: {source}]\n{content}")
+                
                 if source not in sources:
                     sources.append(source)
             
+            context = "\n\n".join(context_parts)
             return context, sources
+            
         except Exception as e:
             print(f"Error retrieving context: {str(e)}")
             return "", []
