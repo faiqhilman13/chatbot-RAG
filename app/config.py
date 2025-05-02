@@ -2,13 +2,20 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.llms import Ollama
 import os
 
+# Base directory
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 # File paths
-VECTORSTORE_DIR = "data/vector_store"
-DOCUMENTS_DIR = "data/documents"
+VECTORSTORE_DIR = os.path.abspath(os.path.join(BASE_DIR, "data/vector_store"))
+DOCUMENTS_DIR = os.path.abspath(os.path.join(BASE_DIR, "data/documents"))
 
 # Ensure directories exist
 os.makedirs(VECTORSTORE_DIR, exist_ok=True)
 os.makedirs(DOCUMENTS_DIR, exist_ok=True)
+
+print(f"DOCUMENTS_DIR: {DOCUMENTS_DIR}")
+print(f"VECTORSTORE_DIR: {VECTORSTORE_DIR}")
+print(f"Both directories exist: {os.path.exists(DOCUMENTS_DIR) and os.path.exists(VECTORSTORE_DIR)}")
 
 # Models
 try:

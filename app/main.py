@@ -52,6 +52,8 @@ def get_html_content():
             .chat-question { background-color: #e6f2f2; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
             .chat-answer { background-color: white; padding: 10px; border-radius: 5px; margin-bottom: 20px; border-left: 3px solid #5e9ca0; }
             .sources { font-size: 0.8em; font-style: italic; margin-top: 10px; color: #666; }
+            .delete-btn { background-color: #e74c3c; color: white; padding: 5px 10px; border: none; border-radius: 3px; cursor: pointer; margin-top: 5px; }
+            .delete-btn:hover { background-color: #c0392b; }
         </style>
     </head>
     <body>
@@ -76,6 +78,17 @@ def get_html_content():
         </div>
         
         <div class="section">
+            <h2>Test Upload (Debug)</h2>
+            <p>This is a simplified upload form for debugging purposes.</p>
+            <form id="testUploadForm">
+                <input type="file" id="testFileUpload" accept=".pdf">
+                <input type="submit" value="Test Upload">
+            </form>
+            <div id="testUploadStatus"></div>
+            <pre id="testUploadResult"></pre>
+        </div>
+        
+        <div class="section">
             <h2>Chat</h2>
             <div class="chat-container" id="chatContainer"></div>
             <textarea id="question" placeholder="Ask a question about the uploaded documents..."></textarea>
@@ -95,20 +108,37 @@ def get_html_content():
                     return;
                 }
                 
+                const file = fileInput.files[0];
+                const title = titleInput.value.trim();
+                
+                // Validate file type
+                if (!file.name.toLowerCase().endsWith('.pdf')) {
+                    alert('Only PDF files are supported');
+                    return;
+                }
+                
                 const formData = new FormData();
-                formData.append('file', fileInput.files[0]);
-                formData.append('title', titleInput.value.trim());
+                formData.append('file', file);
+                formData.append('title', title);
                 
                 const uploadStatus = document.getElementById('uploadStatus');
                 uploadStatus.innerHTML = '<div class="loading">Uploading and processing document...</div>';
                 
                 try {
+                    console.log('Sending upload request for file:', file.name, 'with title:', title);
                     const response = await fetch('/upload', {
                         method: 'POST',
                         body: formData
                     });
                     
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Upload failed');
+                    }
+                    
                     const result = await response.json();
+                    console.log('Upload response:', result);
+                    
                     uploadStatus.innerHTML = '';
                     document.getElementById('uploadResult').textContent = JSON.stringify(result, null, 2);
                     
@@ -119,6 +149,7 @@ def get_html_content():
                     // Refresh document list
                     loadDocuments();
                 } catch (error) {
+                    console.error('Upload error:', error);
                     uploadStatus.innerHTML = '';
                     document.getElementById('uploadResult').textContent = 'Error: ' + error.message;
                 }
@@ -142,6 +173,9 @@ def get_html_content():
                                     <div class="document-info">Filename: ${doc.filename}</div>
                                     <div class="document-info">Pages: ${doc.page_count || 'Unknown'}</div>
                                     <div class="document-info">Size: ${doc.size || 'Unknown'}</div>
+                                    <div style="margin-top: 10px; text-align: right;">
+                                        <button onclick="deleteDocument('${doc.id}')" style="background-color: #e74c3c; color: white; padding: 5px 10px; border: none; border-radius: 3px; cursor: pointer;">Delete Document</button>
+                                    </div>
                                 </div>
                             `;
                         });
@@ -220,6 +254,83 @@ def get_html_content():
             
             // Load documents on page load
             loadDocuments();
+            
+            // Test Upload handling
+            document.getElementById('testUploadForm').onsubmit = async (e) => {
+                e.preventDefault();
+                
+                const fileInput = document.getElementById('testFileUpload');
+                
+                if (!fileInput.files[0]) {
+                    alert('Please select a file for testing');
+                    return;
+                }
+                
+                const file = fileInput.files[0];
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const uploadStatus = document.getElementById('testUploadStatus');
+                uploadStatus.innerHTML = '<div class="loading">Testing upload...</div>';
+                
+                try {
+                    console.log('Sending test upload for file:', file.name);
+                    const response = await fetch('/test-upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Test upload failed');
+                    }
+                    
+                    const result = await response.json();
+                    console.log('Test upload response:', result);
+                    
+                    uploadStatus.innerHTML = '';
+                    document.getElementById('testUploadResult').textContent = JSON.stringify(result, null, 2);
+                    
+                    // Clear form field
+                    fileInput.value = '';
+                    
+                    // Refresh document list
+                    loadDocuments();
+                } catch (error) {
+                    console.error('Test upload error:', error);
+                    uploadStatus.innerHTML = '';
+                    document.getElementById('testUploadResult').textContent = 'Error: ' + error.message;
+                }
+            };
+            
+            // Delete document
+            async function deleteDocument(docId) {
+                if (!confirm('Are you sure you want to delete this document?')) {
+                    return;
+                }
+                
+                try {
+                    console.log('Deleting document:', docId);
+                    const response = await fetch(`/documents/${docId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Delete failed');
+                    }
+                    
+                    const result = await response.json();
+                    console.log('Delete response:', result);
+                    
+                    // Refresh document list
+                    loadDocuments();
+                } catch (error) {
+                    console.error('Delete error:', error);
+                    alert('Error deleting document: ' + error.message);
+                }
+            }
         </script>
     </body>
     </html>
@@ -254,18 +365,35 @@ async def upload_document(file: UploadFile = File(...), title: str = Form(...)):
     # Create a unique ID for the document
     doc_id = str(uuid.uuid4())
     
+    # Make sure directories exist
+    os.makedirs(DOCUMENTS_DIR, exist_ok=True)
+    
+    # Debug information
+    print(f"Uploading document: {file.filename}")
+    print(f"Document ID: {doc_id}")
+    print(f"Document Title: {title}")
+    print(f"DOCUMENTS_DIR: {DOCUMENTS_DIR}")
+    print(f"DOCUMENTS_DIR exists: {os.path.exists(DOCUMENTS_DIR)}")
+    
     # Save the file
     file_location = os.path.join(DOCUMENTS_DIR, f"{doc_id}_{file.filename}")
+    print(f"Saving file to: {file_location}")
     try:
         with open(file_location, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
+        print(f"File saved successfully to {file_location}")
+        print(f"File exists after save: {os.path.exists(file_location)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error saving file: {str(e)}")
+        error_message = f"Error saving file: {str(e)}"
+        print(error_message)
+        raise HTTPException(status_code=500, detail=error_message)
     
     # Process the document
     try:
         # Process the document and add to vectorstore
+        print(f"Processing document: {file_location}")
         docs = prepare_documents(file_location)
+        print(f"Document processed: {len(docs) if docs else 0} chunks created")
         
         # Store document metadata
         file_size = os.path.getsize(file_location)
@@ -279,15 +407,23 @@ async def upload_document(file: UploadFile = File(...), title: str = Form(...)):
             "size": f"{file_size_kb} KB",
             "chunk_count": len(docs) if docs else 0
         }
+        print(f"Document metadata stored: {document_store[doc_id]}")
         
         # Add to vectorstore
         if docs:
             # Ensure vectorstore is loaded
-            if not rag_retriever.load_vectorstore():
+            print("Loading vectorstore")
+            vectorstore_loaded = rag_retriever.load_vectorstore()
+            print(f"Vectorstore loaded: {vectorstore_loaded}")
+            
+            if not vectorstore_loaded:
+                print("Building new vectorstore")
                 rag_retriever.build_vectorstore(docs)
             else:
                 # Add to existing vectorstore
+                print("Adding documents to existing vectorstore")
                 rag_retriever.vectorstore.add_documents(docs)
+                print("Saving vectorstore")
                 rag_retriever.save_vectorstore()
         
         return {
@@ -298,12 +434,87 @@ async def upload_document(file: UploadFile = File(...), title: str = Form(...)):
             "message": f"Document uploaded and processed successfully. Created {len(docs) if docs else 0} chunks."
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
+        error_message = f"Error processing document: {str(e)}"
+        print(error_message)
+        raise HTTPException(status_code=500, detail=error_message)
 
 @app.get("/documents")
 async def list_documents():
     """List all uploaded documents"""
     return {"documents": list(document_store.values())}
+
+@app.post("/test-upload")
+async def test_upload(file: UploadFile = File(...)):
+    """Test endpoint for file upload"""
+    # Make sure directories exist
+    os.makedirs(DOCUMENTS_DIR, exist_ok=True)
+    
+    # Debug information
+    print(f"TEST UPLOAD - File: {file.filename}")
+    print(f"TEST UPLOAD - DOCUMENTS_DIR: {DOCUMENTS_DIR}")
+    print(f"TEST UPLOAD - DOCUMENTS_DIR exists: {os.path.exists(DOCUMENTS_DIR)}")
+    
+    # Save the file with a fixed name for testing
+    file_location = os.path.join(DOCUMENTS_DIR, f"test_{file.filename}")
+    print(f"TEST UPLOAD - Saving file to: {file_location}")
+    
+    try:
+        # Try to create an empty test file first
+        test_file = os.path.join(DOCUMENTS_DIR, "write_test.txt")
+        with open(test_file, "w") as f:
+            f.write("Test write")
+        print(f"TEST UPLOAD - Test file created: {os.path.exists(test_file)}")
+        
+        # Now try to save the uploaded file
+        with open(file_location, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        print(f"TEST UPLOAD - File saved: {os.path.exists(file_location)}")
+        
+        # Return a simple response
+        return {
+            "filename": file.filename,
+            "saved_to": file_location,
+            "exists": os.path.exists(file_location),
+            "size": os.path.getsize(file_location) if os.path.exists(file_location) else 0
+        }
+    except Exception as e:
+        error_message = f"TEST UPLOAD - Error: {str(e)}"
+        print(error_message)
+        raise HTTPException(status_code=500, detail=error_message)
+
+@app.delete("/documents/{doc_id}")
+async def delete_document(doc_id: str):
+    """Delete a document from the system"""
+    if doc_id not in document_store:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Get document path
+    doc_path = document_store[doc_id]["path"]
+    
+    # Check if file exists
+    if not os.path.exists(doc_path):
+        # Document metadata exists but file is missing
+        del document_store[doc_id]
+        return {"status": "success", "message": "Document metadata removed (file was missing)"}
+    
+    # Try to delete the file
+    try:
+        os.remove(doc_path)
+        print(f"Deleted document file: {doc_path}")
+        
+        # Remove from document store
+        del document_store[doc_id]
+        
+        return {
+            "status": "success", 
+            "message": "Document deleted successfully"
+        }
+    except Exception as e:
+        error_message = f"Error deleting document: {str(e)}"
+        print(error_message)
+        raise HTTPException(status_code=500, detail=error_message)
 
 if __name__ == "__main__":
     # Create directories if they don't exist
