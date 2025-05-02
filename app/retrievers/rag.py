@@ -3,6 +3,7 @@ from app.config import EMBEDDING_MODEL, VECTORSTORE_DIR, RETRIEVAL_K
 import os
 import pickle
 from typing import List, Tuple, Optional, Dict, Any
+from langchain.schema import Document
 
 class RAGRetriever:
     def __init__(self):
@@ -70,17 +71,20 @@ class RAGRetriever:
             print(f"Error saving vectorstore: {str(e)}")
             return False
     
-    def retrieve_context(self, question: str, k: int = None, source_filter: str = None) -> Tuple[str, List[str]]:
-        """Retrieve context for a question, optionally filtered by source document
+    def retrieve_context(self, question: str, k: int = None) -> List[Document]:
+        """Retrieve relevant document chunks for a question.
         
         Args:
-            question: The question to retrieve context for
-            k: Number of documents to retrieve
-            source_filter: Only include documents from this source/filename
+            question: The question to retrieve context for.
+            k: Number of documents/chunks to retrieve.
+            
+        Returns:
+            A list of relevant Document objects.
         """
         if not self.vectorstore:
             if not self.load_vectorstore():
-                return "", []
+                print("[Retriever] Vectorstore not loaded, returning empty list.")
+                return []
                 
         if k is None:
             k = RETRIEVAL_K
@@ -90,35 +94,21 @@ class RAGRetriever:
                 search_type="similarity", 
                 search_kwargs={"k": k}
             )
-            docs = retriever.get_relevant_documents(question)
+            # Retrieve the full Document objects
+            relevant_docs: List[Document] = retriever.get_relevant_documents(question)
             
-            # Print retrieved sources for debugging
-            sources_set = {doc.metadata.get("source", "unknown") for doc in docs}
-            print(f"[RETRIEVED SOURCES] {sources_set}")
+            print(f"[Retriever] Retrieved {len(relevant_docs)} chunks for question.")
+            # Optionally print retrieved sources/metadata for debugging
+            # for i, doc in enumerate(relevant_docs):
+            #     print(f"  - Doc {i}: {doc.metadata}")
             
-            # Filter by source if specified
-            if source_filter:
-                print(f"[INFO] Filtering retrieved documents by source: {source_filter}")
-                filtered_docs = [doc for doc in docs if doc.metadata.get("source") == source_filter]
-                if not filtered_docs:
-                    print(f"[WARNING] No documents matched source filter '{source_filter}'. Using all documents.")
-                else:
-                    print(f"[INFO] Filtered from {len(docs)} to {len(filtered_docs)} documents")
-                    docs = filtered_docs
+            # No source_filter logic needed here anymore
             
-            context = "\n\n".join([doc.page_content for doc in docs])
-            sources = []
-            
-            # Extract unique sources
-            for doc in docs:
-                source = doc.metadata.get("source", "unknown")
-                if source not in sources:
-                    sources.append(source)
-            
-            return context, sources
+            # Return the list of documents directly
+            return relevant_docs
         except Exception as e:
             print(f"Error retrieving context: {str(e)}")
-            return "", []
+            return []
 
 # Create a singleton instance
 rag_retriever = RAGRetriever() 

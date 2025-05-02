@@ -1,290 +1,274 @@
-document.addEventListener('DOMContentLoaded', function() {
-    // DOM Elements
-    const chatForm = document.getElementById('chat-form');
-    const userInput = document.getElementById('user-input');
-    const chatMessages = document.getElementById('chat-messages');
-    const apiStatus = document.getElementById('api-status');
-    const sourcePanel = document.getElementById('source-panel');
-    const closePanel = document.getElementById('close-panel');
-    const sourceContent = document.getElementById('source-content');
-    const testApiBtn = document.getElementById('test-api-btn');
+document.addEventListener('DOMContentLoaded', () => {
+    loadDocuments(); // Load documents when the page loads
+    setupEventListeners();
+});
 
-    // API Configuration
-    const API_URL = 'http://localhost:8000';
-    const API_ENDPOINTS = {
-        health: `${API_URL}/health`,
-        ask: `${API_URL}/api/v1/ask`
-    };
+function setupEventListeners() {
+    const uploadForm = document.getElementById('uploadForm');
+    const questionTextarea = document.getElementById('question');
+    const askButton = document.getElementById('askButton');
 
-    // State
-    let conversationId = null;
-    let isWaitingForResponse = false;
+    if (uploadForm) {
+        uploadForm.onsubmit = handleUpload;
+    }
 
-    // Check API status
-    checkApiStatus();
+    if (questionTextarea) {
+        // Allow Shift+Enter for new line, Enter to submit
+        questionTextarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); // Prevent default Enter behavior (new line)
+                askQuestion();
+            }
+        });
+    }
     
-    // Event Listeners
-    chatForm.addEventListener('submit', handleSubmit);
-    closePanel.addEventListener('click', toggleSourcePanel);
-    testApiBtn.addEventListener('click', testApiConnection);
-
-    // Functions
-    function checkApiStatus() {
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', API_ENDPOINTS.health, true);
-        
-        xhr.onload = function() {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    const data = JSON.parse(xhr.responseText);
-                    
-                    if (data.status === 'healthy') {
-                        apiStatus.textContent = 'Online';
-                        apiStatus.classList.add('online');
-                    } else {
-                        apiStatus.textContent = 'Degraded';
-                        apiStatus.classList.add('offline');
-                    }
-                } catch (error) {
-                    apiStatus.textContent = 'Error';
-                    apiStatus.classList.add('offline');
-                    console.error('API Status parse failed:', error);
-                }
-            } else {
-                apiStatus.textContent = 'Offline';
-                apiStatus.classList.add('offline');
-                console.error('API Status check failed with status:', xhr.status);
-            }
-        };
-        
-        xhr.onerror = function() {
-            apiStatus.textContent = 'Offline';
-            apiStatus.classList.add('offline');
-            console.error('API Status check failed with network error');
-        };
-        
-        xhr.send();
+    // Keep ask button listener as well for click interaction
+    if(askButton) {
+        askButton.onclick = askQuestion;
     }
+}
 
-    async function testApiConnection() {
-        console.log("Testing API connection directly...");
-        const testMessage = "This is a test message";
-        
-        // Show a system message for the test
-        addMessage("Testing API connection...", "system");
-        
-        // Create a new XMLHttpRequest object
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', API_ENDPOINTS.ask, true);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        
-        xhr.onload = function() {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    const data = JSON.parse(xhr.responseText);
-                    console.log('Test response data:', data);
-                    addMessage(`API test successful! Response: ${data.answer}`, "system");
-                } catch (error) {
-                    console.error('Error parsing JSON response:', error);
-                    addMessage(`API test succeeded but couldn't parse response: ${xhr.responseText.substring(0, 100)}...`, "system");
-                }
-            } else {
-                console.error('API test error:', xhr.statusText);
-                addMessage(`API test failed with status ${xhr.status}: ${xhr.responseText}`, "system");
-            }
-        };
-        
-        xhr.onerror = function() {
-            console.error('API test network error');
-            addMessage("API test failed: Network error - Check browser console and make sure CORS is properly configured", "system");
-            
-            // Additional troubleshooting information
-            addMessage("Troubleshooting steps: 1) Check that backend is running at " + API_URL + 
-                      " 2) Check browser console for detailed errors 3) Try direct API call with Python test_api.py", "system");
-        };
-        
-        // Send the request
-        xhr.send(JSON.stringify({ question: testMessage }));
+// --- UI Update Functions ---
+
+function displayMessage(containerId, message, type = 'info') {
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.textContent = message;
+        container.className = `status ${type}`;
     }
+}
 
-    async function handleSubmit(e) {
-        e.preventDefault();
-        
-        const message = userInput.value.trim();
-        if (!message || isWaitingForResponse) return;
-        
-        // Add user message to chat
-        addMessage(message, 'user');
-        userInput.value = '';
-        
-        // Show typing indicator
-        showTypingIndicator();
-        isWaitingForResponse = true;
-        
-        try {
-            const response = await fetchAnswer(message);
-            // Remove typing indicator
-            removeTypingIndicator();
-            
-            // Add bot response
-            if (response) {
-                addMessage(response.answer, 'bot', response.sources, response.confidence);
-            } else {
-                addMessage('Sorry, I could not generate a response. Please try again.', 'bot');
-            }
-        } catch (error) {
-            removeTypingIndicator();
-            addMessage(`Error: ${error.message}`, 'bot');
-            console.error('Error fetching answer:', error);
+function clearStatus(containerId) {
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.textContent = '';
+        container.className = 'status';
+    }
+}
+
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return unsafe
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;");
+}
+
+function addChatMessage(sender, message, sources = null) {
+    const chatContainer = document.getElementById('chatContainer');
+    if (!chatContainer) return;
+
+    const messageDiv = document.createElement('div');
+    messageDiv.classList.add('chat-message');
+
+    if (sender === 'user') {
+        messageDiv.classList.add('chat-question');
+        messageDiv.textContent = message;
+    } else { // sender === 'bot'
+        messageDiv.classList.add('chat-answer');
+        // Use <pre> for potentially formatted bot answers
+        const preFormatted = document.createElement('pre');
+        preFormatted.textContent = message;
+        messageDiv.appendChild(preFormatted);
+
+        if (sources && sources.length > 0) {
+            const sourcesDiv = document.createElement('div');
+            sourcesDiv.classList.add('sources');
+            sourcesDiv.innerHTML = '<strong>Sources:</strong><br>' + 
+                sources.map(s => `- ${escapeHtml(s.title || s.source || 'Unknown Source')} (Page ${s.page || 'N/A'})`).join('<br>');
+            messageDiv.appendChild(sourcesDiv);
         }
-        
-        isWaitingForResponse = false;
     }
 
-    async function fetchAnswer(question) {
-        console.log(`Sending request to ${API_ENDPOINTS.ask}`);
-        const requestBody = {
-            question: question
-        };
-        
-        if (conversationId) {
-            requestBody.conversation_id = conversationId;
-        }
-        
-        console.log('Request body:', JSON.stringify(requestBody));
-        
-        return new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', API_ENDPOINTS.ask, true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            
-            xhr.onload = function() {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    try {
-                        const data = JSON.parse(xhr.responseText);
-                        console.log('Response data:', data);
-                        resolve(data);
-                    } catch (error) {
-                        console.error('Error parsing JSON response:', error);
-                        reject(new Error('Failed to parse server response'));
-                    }
-                } else {
-                    console.error('API error response:', xhr.responseText);
-                    reject(new Error(`API error (${xhr.status}): ${xhr.responseText}`));
-                }
-            };
-            
-            xhr.onerror = function() {
-                console.error('Network error occurred');
-                reject(new Error('Network error - Failed to reach the server'));
-            };
-            
-            xhr.send(JSON.stringify(requestBody));
+    chatContainer.appendChild(messageDiv);
+    chatContainer.scrollTop = chatContainer.scrollHeight; // Auto-scroll to bottom
+}
+
+// --- API Interaction Functions ---
+
+async function handleUpload(event) {
+    event.preventDefault();
+    const fileInput = document.getElementById('fileUpload');
+    const titleInput = document.getElementById('docTitle');
+    const uploadStatus = document.getElementById('uploadStatus');
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        displayMessage('uploadStatus', 'Please select a PDF file.', 'error');
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const title = titleInput.value.trim() || file.name; // Use filename if title is empty
+
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+        displayMessage('uploadStatus', 'Only PDF files are supported.', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('title', title);
+
+    displayMessage('uploadStatus', 'Uploading and processing document...', 'loading');
+
+    try {
+        const response = await fetch('/upload', {
+            method: 'POST',
+            body: formData
         });
-    }
 
-    function addMessage(text, sender, sources = [], confidence = null) {
-        const messageDiv = document.createElement('div');
-        messageDiv.classList.add('message', sender);
-        
-        const contentDiv = document.createElement('div');
-        contentDiv.classList.add('message-content');
-        
-        const messageText = document.createElement('p');
-        messageText.textContent = text;
-        contentDiv.appendChild(messageText);
-        
-        // Add time
-        const timeDiv = document.createElement('div');
-        timeDiv.classList.add('message-time');
-        timeDiv.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        contentDiv.appendChild(timeDiv);
-        
-        // Add confidence if provided
-        if (confidence !== null && sender === 'bot') {
-            const confidenceText = document.createElement('div');
-            confidenceText.classList.add('message-confidence');
-            confidenceText.textContent = `Confidence: ${Math.round(confidence * 100)}%`;
-            contentDiv.appendChild(confidenceText);
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.detail || `Upload failed with status ${response.status}`);
         }
+
+        console.log('Upload response:', result);
+        displayMessage('uploadStatus', `Document '${escapeHtml(result.title)}' uploaded successfully (ID: ${result.doc_id})`, 'success');
         
-        // Add sources if provided and not empty
-        if (sources && sources.length > 0 && sender === 'bot') {
-            const sourcesLink = document.createElement('div');
-            sourcesLink.classList.add('message-sources');
-            sourcesLink.textContent = `Sources (${sources.length})`;
-            sourcesLink.addEventListener('click', () => {
-                displaySources(sources);
-                toggleSourcePanel(true);
+        // Clear form fields
+        fileInput.value = '';
+        titleInput.value = '';
+        
+        loadDocuments(); // Refresh document list after successful upload
+
+    } catch (error) {
+        console.error('Upload error:', error);
+        displayMessage('uploadStatus', `Error: ${error.message}`, 'error');
+    }
+}
+
+async function loadDocuments() {
+    const documentList = document.getElementById('documentList');
+    if (!documentList) return;
+    
+    documentList.innerHTML = '<div class="loading">Loading documents...</div>';
+
+    try {
+        const response = await fetch('/documents');
+        if (!response.ok) {
+             const errorData = await response.json().catch(() => ({ detail: 'Failed to fetch documents.' }));
+             throw new Error(errorData.detail || `HTTP error ${response.status}`);
+        }
+        const result = await response.json();
+        
+        if (result.documents && result.documents.length > 0) {
+            documentList.innerHTML = ''; // Clear loading message
+            result.documents.forEach(doc => {
+                const card = document.createElement('div');
+                card.className = 'document-card';
+                card.innerHTML = `
+                    <div class="document-info">
+                        <div class="document-title">${escapeHtml(doc.title)}</div>
+                        Filename: ${escapeHtml(doc.filename)} <br>
+                        ID: ${escapeHtml(doc.id)}
+                    </div>
+                    <button class="delete-btn" onclick="deleteDocument('${doc.id}', this)">Delete</button>
+                `;
+                documentList.appendChild(card);
             });
-            contentDiv.appendChild(sourcesLink);
-        }
-        
-        messageDiv.appendChild(contentDiv);
-        chatMessages.appendChild(messageDiv);
-        
-        // Scroll to the bottom
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-
-    function showTypingIndicator() {
-        const typingDiv = document.createElement('div');
-        typingDiv.classList.add('message', 'bot', 'typing-indicator-container');
-        typingDiv.innerHTML = `
-            <div class="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-        `;
-        chatMessages.appendChild(typingDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-
-    function removeTypingIndicator() {
-        const typingIndicator = document.querySelector('.typing-indicator-container');
-        if (typingIndicator) {
-            typingIndicator.remove();
-        }
-    }
-
-    function displaySources(sources) {
-        // Clear previous sources
-        sourceContent.innerHTML = '';
-        
-        if (sources.length === 0) {
-            const noSources = document.createElement('p');
-            noSources.textContent = 'No sources available.';
-            sourceContent.appendChild(noSources);
-            return;
-        }
-        
-        // Add sources to panel
-        sources.forEach((source, index) => {
-            const sourceDiv = document.createElement('div');
-            sourceDiv.classList.add('source-item');
-            
-            const sourceName = document.createElement('div');
-            sourceName.classList.add('source-name');
-            sourceName.textContent = `Source ${index + 1}`;
-            
-            const sourceText = document.createElement('div');
-            sourceText.classList.add('source-text');
-            sourceText.textContent = source;
-            
-            sourceDiv.appendChild(sourceName);
-            sourceDiv.appendChild(sourceText);
-            sourceContent.appendChild(sourceDiv);
-        });
-    }
-
-    function toggleSourcePanel(show) {
-        if (show === true) {
-            sourcePanel.classList.add('active');
-        } else if (show === false) {
-            sourcePanel.classList.remove('active');
         } else {
-            sourcePanel.classList.toggle('active');
+            documentList.innerHTML = '<p>No documents uploaded yet.</p>';
         }
+    } catch (error) {
+        console.error('Error loading documents:', error);
+        documentList.innerHTML = `<p style="color: red;">Error loading documents: ${error.message}</p>`;
     }
-}); 
+}
+
+async function deleteDocument(docId, buttonElement) {
+    if (!confirm(`Are you sure you want to delete document ID: ${docId}?`)) {
+        return;
+    }
+
+    // Visually indicate deletion is in progress
+    const originalButtonText = buttonElement.textContent;
+    buttonElement.textContent = 'Deleting...';
+    buttonElement.disabled = true;
+
+    try {
+        const response = await fetch(`/documents/${docId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+             throw new Error(result.detail || `Failed to delete with status ${response.status}`);
+        }
+
+        console.log('Delete response:', result);
+        
+        // Remove the document card from the UI
+        const card = buttonElement.closest('.document-card');
+        if (card) {
+            card.remove();
+        }
+        
+        // Optional: Show success message elsewhere if needed
+        // displayMessage('someStatusElement', `Document ${docId} deleted.`, 'success');
+
+        // Check if the list is now empty
+        const documentList = document.getElementById('documentList');
+        if (documentList && !documentList.querySelector('.document-card')) {
+             documentList.innerHTML = '<p>No documents uploaded yet.</p>';
+        }
+
+    } catch (error) {
+        console.error('Delete error:', error);
+        alert(`Error deleting document: ${error.message}`);
+        // Restore button if deletion failed
+        buttonElement.textContent = originalButtonText;
+        buttonElement.disabled = false;
+    }
+}
+
+async function askQuestion() {
+    const questionInput = document.getElementById('question');
+    const askButton = document.getElementById('askButton');
+    const question = questionInput.value.trim();
+
+    if (!question) return;
+
+    // Add user's question to chat UI
+    addChatMessage('user', question);
+
+    // Disable input and button during processing
+    questionInput.value = ''; // Clear input
+    questionInput.disabled = true;
+    askButton.disabled = true;
+    askButton.textContent = 'Thinking...';
+
+    try {
+        const response = await fetch('/ask', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ question: question })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.detail || `Error fetching answer (${response.status})`);
+        }
+
+        console.log('Ask response:', result);
+
+        // Add bot's answer to chat UI
+        addChatMessage('bot', result.answer, result.sources);
+
+    } catch (error) {
+        console.error('Ask error:', error);
+        addChatMessage('bot', `Sorry, there was an error: ${error.message}`);
+    } finally {
+        // Re-enable input and button
+        questionInput.disabled = false;
+        askButton.disabled = false;
+        askButton.textContent = 'Ask';
+        questionInput.focus(); // Set focus back to the input field
+    }
+} 

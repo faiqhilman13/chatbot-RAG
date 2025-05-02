@@ -4,18 +4,24 @@ from app.retrievers.rag import rag_retriever
 from app.llm.ollama_runner import ollama_runner
 from app.config import DOCUMENTS_DIR
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
+from langchain.schema import Document
 
 router = APIRouter(tags=["qa"])
 
 class QuestionRequest(BaseModel):
     question: str
 
+class SourceDocument(BaseModel):
+    source: Optional[str] = None
+    title: Optional[str] = None
+    page: Optional[int] = None
+
 class QuestionResponse(BaseModel):
     question: str
     answer: str
-    sources: List[str]
+    sources: List[SourceDocument]
 
 @router.post("/ask", response_model=QuestionResponse)
 async def ask_question(request: QuestionRequest):
@@ -25,50 +31,44 @@ async def ask_question(request: QuestionRequest):
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty")
     
-    # Load or build vectorstore
     if not rag_retriever.load_vectorstore():
-        # If vectorstore doesn't exist, build it from available documents
-        docs = get_all_documents(DOCUMENTS_DIR)
-        if not docs:
-            return {
-                "question": question,
-                "answer": "No documents found to answer your question. Please upload some PDF documents first.",
-                "sources": []
-            }
+        return QuestionResponse(
+            question=question,
+            answer="Vector store not initialized. Please upload documents first.",
+            sources=[]
+        )
         
-        rag_retriever.build_vectorstore(docs)
+    print(f"[INFO] Retrieving context for question: '{question}' (no source filter)")
     
-    # Get the most recent document filename if there are any documents
-    from app.main import document_store
+    relevant_docs: List[Document] = rag_retriever.retrieve_context(question=question)
     
-    most_recent_filename = None
-    if document_store:
-        # Get the most recent document ID (assuming the latest added is the one we want)
-        most_recent_doc = list(document_store.values())[-1]
-        most_recent_filename = most_recent_doc.get("filename")
-        print(f"[INFO] Using most recent document: {most_recent_filename}")
+    if not relevant_docs:
+        return QuestionResponse(
+            question=question,
+            answer="I couldn't find any relevant information to answer your question.",
+            sources=[]
+        )
     
-    # Retrieve context, filtered by the most recent document if available
-    context, sources = rag_retriever.retrieve_context(
-        question=question,
-        source_filter=most_recent_filename
-    )
+    context = "\n\n".join([doc.page_content for doc in relevant_docs])
     
-    if not context:
-        return {
-            "question": question,
-            "answer": "I couldn't find any relevant information to answer your question.",
-            "sources": []
-        }
-    
-    # Get answer from LLM
+    formatted_sources = [
+        SourceDocument(
+            source=doc.metadata.get("source"),
+            title=doc.metadata.get("title"),
+            page=doc.metadata.get("page")
+        ) 
+        for doc in relevant_docs
+    ]
+
+    print(f"[INFO] Sending question and context to LLM.")
     answer = ollama_runner.get_answer_from_context(question, context)
+    print(f"[INFO] Received answer from LLM.")
     
-    return {
-        "question": question,
-        "answer": answer,
-        "sources": sources
-    }
+    return QuestionResponse(
+        question=question,
+        answer=answer,
+        sources=formatted_sources
+    )
 
 @router.post("/upload_and_process")
 async def upload_and_process(file_path: str):

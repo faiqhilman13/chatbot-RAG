@@ -15,6 +15,7 @@ The system uses a hybrid approach combining RAG (Retrieval Augmented Generation)
    - FAISS vector storage
    - Sentence transformer embeddings
    - Semantic similarity search
+   - Source filtering to restrict context to current document
 
 3. **LLM Integration**
    - Ollama runner for generating responses
@@ -25,11 +26,19 @@ The system uses a hybrid approach combining RAG (Retrieval Augmented Generation)
    - FastAPI endpoints
    - Document upload and management
    - Question answering interface
+   - Document deletion
 
 5. **UI Layer**
-   - HTML/JS interface
+   - Embedded HTML/JS interface in the FastAPI app
    - Document library management
    - Chat interface
+   - Delete functionality for documents
+
+6. **Standalone Frontend (Planned)**
+   - Simple, clean HTML/CSS/JS interface
+   - Mobile-responsive design
+   - Improved user experience
+   - Better error handling and user feedback
 
 ## Project Structure
 
@@ -49,6 +58,12 @@ chatbot/
 ├── data/
 │   ├── documents/            # Uploaded PDF storage
 │   └── vector_store/         # FAISS vector database
+├── frontend/                 # Standalone frontend (planned)
+│   ├── index.html            # Main frontend page
+│   ├── css/                  # Stylesheets
+│   │   └── style.css         # Main stylesheet
+│   └── js/                   # JavaScript files
+│       └── app.js            # Frontend logic
 └── requirements.txt          # Project dependencies
 ```
 
@@ -61,6 +76,7 @@ chatbot/
 - **LLM**: Ollama (with fallback mechanisms)
 - **Document Processing**: PyPDF
 - **Frontend**: HTML, JavaScript, CSS
+- **Frontend Framework**: None (vanilla JS for simplicity)
 
 ## Style Guidelines
 
@@ -68,4 +84,18 @@ chatbot/
 - Google-style docstrings
 - Type hints for all functions
 - Error handling with graceful fallbacks
-- Logging for all operations 
+- Logging for all operations
+- Clean, minimalist UI for frontend
+- Mobile-first responsive design
+
+## Standalone Frontend Design
+
+The standalone frontend will be a simple, clean interface that allows users to:
+
+1. Upload PDF documents
+2. View a list of uploaded documents
+3. Delete documents when no longer needed
+4. Ask questions about the uploaded documents
+5. View answers with source information
+
+The design will prioritize simplicity, usability, and responsiveness across devices. 

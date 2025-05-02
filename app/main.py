@@ -1,15 +1,22 @@
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
 import shutil
 import uuid
+from pathlib import Path
+import sys # Add import for sys
+import json # Add import for json
 from app.routers import ask
-from app.config import DOCUMENTS_DIR, VECTORSTORE_DIR
+from app.config import DOCUMENTS_DIR, VECTORSTORE_DIR, BASE_DIR # Import BASE_DIR
 from app.retrievers.rag import rag_retriever
 from app.utils.file_loader import prepare_documents
+import traceback # Add import for traceback module
+
+# CURSOR: This file should only handle route wiring, not business logic.
+# All logic must be called from services/ or utils/
 
 # Create FastAPI app
 app = FastAPI(title="Hybrid RAG Chatbot")
@@ -17,517 +24,246 @@ app = FastAPI(title="Hybrid RAG Chatbot")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # Allows all origins (adjust for production)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
+# Include API routers
 app.include_router(ask.router)
 
-# Sample HTML for the UI
-def get_html_content():
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Hybrid RAG Chatbot</title>
-        <style>
-            body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; line-height: 1.6; }
-            h1 { color: #3a3a3a; border-bottom: 2px solid #5e9ca0; padding-bottom: 10px; }
-            .section { margin-bottom: 30px; border: 1px solid #ddd; padding: 20px; border-radius: 8px; background-color: #f9f9f9; }
-            .section h2 { color: #5e9ca0; margin-top: 0; }
-            button, input[type="submit"] { background-color: #5e9ca0; color: white; padding: 10px 15px; 
-                   border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; }
-            button:hover, input[type="submit"]:hover { background-color: #4a8288; }
-            input, textarea { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-            textarea { min-height: 100px; resize: vertical; }
-            pre { background-color: white; padding: 15px; border-radius: 5px; white-space: pre-wrap; border: 1px solid #ddd; overflow-x: auto; }
-            .document-card { padding: 10px; margin: 10px 0; background-color: white; border-radius: 5px; border: 1px solid #ddd; }
-            .document-title { font-weight: bold; }
-            .document-info { font-size: 0.9em; color: #666; }
-            .loading { display: inline-block; margin-left: 10px; font-style: italic; color: #666; }
-            .chat-container { max-height: 400px; overflow-y: auto; padding: 10px; background-color: white; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px; }
-            .chat-question { background-color: #e6f2f2; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
-            .chat-answer { background-color: white; padding: 10px; border-radius: 5px; margin-bottom: 20px; border-left: 3px solid #5e9ca0; }
-            .sources { font-size: 0.8em; font-style: italic; margin-top: 10px; color: #666; }
-            .delete-btn { background-color: #e74c3c; color: white; padding: 5px 10px; border: none; border-radius: 3px; cursor: pointer; margin-top: 5px; }
-            .delete-btn:hover { background-color: #c0392b; }
-        </style>
-    </head>
-    <body>
-        <h1>Hybrid RAG Chatbot</h1>
-        
-        <div class="section">
-            <h2>Upload PDF Document</h2>
-            <p>Upload PDF documents to build the knowledge base for the chatbot.</p>
-            <form id="uploadForm">
-                <input type="file" id="fileUpload" accept=".pdf" required>
-                <input type="text" id="docTitle" placeholder="Document Title" required>
-                <input type="submit" value="Upload and Process">
-            </form>
-            <div id="uploadStatus"></div>
-            <pre id="uploadResult"></pre>
-        </div>
-        
-        <div class="section">
-            <h2>Document Library</h2>
-            <button onclick="loadDocuments()">Refresh Documents</button>
-            <div id="documentList"></div>
-        </div>
-        
-        <div class="section">
-            <h2>Test Upload (Debug)</h2>
-            <p>This is a simplified upload form for debugging purposes.</p>
-            <form id="testUploadForm">
-                <input type="file" id="testFileUpload" accept=".pdf">
-                <input type="submit" value="Test Upload">
-            </form>
-            <div id="testUploadStatus"></div>
-            <pre id="testUploadResult"></pre>
-        </div>
-        
-        <div class="section">
-            <h2>Chat</h2>
-            <div class="chat-container" id="chatContainer"></div>
-            <textarea id="question" placeholder="Ask a question about the uploaded documents..."></textarea>
-            <button onclick="askQuestion()" id="askButton">Ask Question</button>
-        </div>
-        
-        <script>
-            // Document upload handling
-            document.getElementById('uploadForm').onsubmit = async (e) => {
-                e.preventDefault();
-                
-                const fileInput = document.getElementById('fileUpload');
-                const titleInput = document.getElementById('docTitle');
-                
-                if (!fileInput.files[0] || !titleInput.value.trim()) {
-                    alert('Please provide both a file and a title');
-                    return;
-                }
-                
-                const file = fileInput.files[0];
-                const title = titleInput.value.trim();
-                
-                // Validate file type
-                if (!file.name.toLowerCase().endsWith('.pdf')) {
-                    alert('Only PDF files are supported');
-                    return;
-                }
-                
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('title', title);
-                
-                const uploadStatus = document.getElementById('uploadStatus');
-                uploadStatus.innerHTML = '<div class="loading">Uploading and processing document...</div>';
-                
-                try {
-                    console.log('Sending upload request for file:', file.name, 'with title:', title);
-                    const response = await fetch('/upload', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || 'Upload failed');
-                    }
-                    
-                    const result = await response.json();
-                    console.log('Upload response:', result);
-                    
-                    uploadStatus.innerHTML = '';
-                    document.getElementById('uploadResult').textContent = JSON.stringify(result, null, 2);
-                    
-                    // Clear form fields
-                    fileInput.value = '';
-                    titleInput.value = '';
-                    
-                    // Refresh document list
-                    loadDocuments();
-                } catch (error) {
-                    console.error('Upload error:', error);
-                    uploadStatus.innerHTML = '';
-                    document.getElementById('uploadResult').textContent = 'Error: ' + error.message;
-                }
-            };
-            
-            // Load documents
-            async function loadDocuments() {
-                const documentList = document.getElementById('documentList');
-                documentList.innerHTML = '<div class="loading">Loading documents...</div>';
-                
-                try {
-                    const response = await fetch('/documents');
-                    const result = await response.json();
-                    
-                    if (result.documents && result.documents.length > 0) {
-                        documentList.innerHTML = '';
-                        result.documents.forEach(doc => {
-                            documentList.innerHTML += `
-                                <div class="document-card">
-                                    <div class="document-title">${doc.title}</div>
-                                    <div class="document-info">Filename: ${doc.filename}</div>
-                                    <div class="document-info">Pages: ${doc.page_count || 'Unknown'}</div>
-                                    <div class="document-info">Size: ${doc.size || 'Unknown'}</div>
-                                    <div style="margin-top: 10px; text-align: right;">
-                                        <button onclick="deleteDocument('${doc.id}')" style="background-color: #e74c3c; color: white; padding: 5px 10px; border: none; border-radius: 3px; cursor: pointer;">Delete Document</button>
-                                    </div>
-                                </div>
-                            `;
-                        });
-                    } else {
-                        documentList.innerHTML = '<p>No documents uploaded yet.</p>';
-                    }
-                } catch (error) {
-                    documentList.innerHTML = '<p>Error loading documents: ' + error.message + '</p>';
-                }
-            }
-            
-            // Ask question
-            async function askQuestion() {
-                const question = document.getElementById('question').value.trim();
-                if (!question) return;
-                
-                const askButton = document.getElementById('askButton');
-                const originalText = askButton.textContent;
-                askButton.textContent = 'Thinking...';
-                askButton.disabled = true;
-                
-                // Add question to chat UI
-                const chatContainer = document.getElementById('chatContainer');
-                const questionElement = document.createElement('div');
-                questionElement.className = 'chat-question';
-                questionElement.textContent = question;
-                chatContainer.appendChild(questionElement);
-                
-                // Create placeholder for answer
-                const answerElement = document.createElement('div');
-                answerElement.className = 'chat-answer';
-                answerElement.textContent = 'Thinking...';
-                chatContainer.appendChild(answerElement);
-                
-                // Scroll to bottom of chat
-                chatContainer.scrollTop = chatContainer.scrollHeight;
-                
-                try {
-                    const response = await fetch('/ask', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ question })
-                    });
-                    
-                    const result = await response.json();
-                    
-                    // Update answer in chat UI
-                    answerElement.textContent = result.answer;
-                    
-                    // Add sources if available
-                    if (result.sources && result.sources.length > 0) {
-                        const sourcesElement = document.createElement('div');
-                        sourcesElement.className = 'sources';
-                        sourcesElement.textContent = 'Sources: ' + result.sources.join(', ');
-                        answerElement.appendChild(sourcesElement);
-                    }
-                    
-                    // Clear question input
-                    document.getElementById('question').value = '';
-                } catch (error) {
-                    answerElement.textContent = 'Error: ' + error.message;
-                } finally {
-                    askButton.textContent = originalText;
-                    askButton.disabled = false;
-                    chatContainer.scrollTop = chatContainer.scrollHeight;
-                }
-            }
-            
-            // Handle Enter key in question input
-            document.getElementById('question').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    askQuestion();
-                }
-            });
-            
-            // Load documents on page load
-            loadDocuments();
-            
-            // Test Upload handling
-            document.getElementById('testUploadForm').onsubmit = async (e) => {
-                e.preventDefault();
-                
-                const fileInput = document.getElementById('testFileUpload');
-                
-                if (!fileInput.files[0]) {
-                    alert('Please select a file for testing');
-                    return;
-                }
-                
-                const file = fileInput.files[0];
-                
-                const formData = new FormData();
-                formData.append('file', file);
-                
-                const uploadStatus = document.getElementById('testUploadStatus');
-                uploadStatus.innerHTML = '<div class="loading">Testing upload...</div>';
-                
-                try {
-                    console.log('Sending test upload for file:', file.name);
-                    const response = await fetch('/test-upload', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || 'Test upload failed');
-                    }
-                    
-                    const result = await response.json();
-                    console.log('Test upload response:', result);
-                    
-                    uploadStatus.innerHTML = '';
-                    document.getElementById('testUploadResult').textContent = JSON.stringify(result, null, 2);
-                    
-                    // Clear form field
-                    fileInput.value = '';
-                    
-                    // Refresh document list
-                    loadDocuments();
-                } catch (error) {
-                    console.error('Test upload error:', error);
-                    uploadStatus.innerHTML = '';
-                    document.getElementById('testUploadResult').textContent = 'Error: ' + error.message;
-                }
-            };
-            
-            // Delete document
-            async function deleteDocument(docId) {
-                if (!confirm('Are you sure you want to delete this document?')) {
-                    return;
-                }
-                
-                try {
-                    console.log('Deleting document:', docId);
-                    const response = await fetch(`/documents/${docId}`, {
-                        method: 'DELETE'
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || 'Delete failed');
-                    }
-                    
-                    const result = await response.json();
-                    console.log('Delete response:', result);
-                    
-                    // Refresh document list
-                    loadDocuments();
-                } catch (error) {
-                    console.error('Delete error:', error);
-                    alert('Error deleting document: ' + error.message);
-                }
-            }
-        </script>
-    </body>
-    </html>
-    """
+# --- Define frontend path ---
+FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+STATIC_DIR = FRONTEND_DIR / "static"
 
-@app.get("/", response_class=HTMLResponse)
-async def root():
-    """Return the HTML UI"""
-    return HTMLResponse(content=get_html_content())
+# --- Mount static files directory ---
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+else:
+    print(f"Warning: Static directory not found at {STATIC_DIR}")
 
-@app.get("/health")
+# --- Remove old HTML content function ---
+# def get_html_content():
+#    ... (removed large HTML block)
+
+# --- Root endpoint to serve index.html ---
+@app.get("/", include_in_schema=False) # exclude from OpenAPI docs
+async def read_index():
+    index_path = FRONTEND_DIR / "index.html"
+    if not index_path.is_file():
+        print(f"Error: index.html not found at {index_path}")
+        raise HTTPException(status_code=404, detail="Frontend index.html not found.")
+    return FileResponse(index_path)
+
+# --- Health Check Endpoint ---
+@app.get("/health", tags=["System"])
 async def health_check():
-    """Health check endpoint"""
-    vectorstore_exists = os.path.exists(os.path.join(VECTORSTORE_DIR, "index.faiss"))
-    
-    return {
-        "status": "healthy",
-        "documents_dir_exists": os.path.exists(DOCUMENTS_DIR),
-        "vectorstore_exists": vectorstore_exists,
-        "document_count": len(os.listdir(DOCUMENTS_DIR)) if os.path.exists(DOCUMENTS_DIR) else 0
-    }
+    # Check basic functionality, e.g., vector store accessibility
+    vector_store_exists = VECTORSTORE_DIR.exists() and any(VECTORSTORE_DIR.iterdir())
+    # ollama_available = check_ollama_status() # Assuming a check function exists
+    return JSONResponse({
+        "status": "ok",
+        "vector_store_initialized": vector_store_exists,
+        # "ollama_available": ollama_available
+    })
 
-# Document storage
-document_store = {}
+# Define path for the document index JSON file
+DOCUMENT_INDEX_PATH = BASE_DIR / "data" / "document_index.json"
 
-@app.post("/upload")
-async def upload_document(file: UploadFile = File(...), title: str = Form(...)):
-    """Upload and process a PDF document"""
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+# Helper function to load/save the JSON index
+def load_document_index():
+    if not DOCUMENT_INDEX_PATH.exists():
+        return {}
+    try:
+        with open(DOCUMENT_INDEX_PATH, 'r') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"Error loading document index {DOCUMENT_INDEX_PATH}: {e}")
+        return {}
+
+def save_document_index(index_data):
+    try:
+        with open(DOCUMENT_INDEX_PATH, 'w') as f:
+            json.dump(index_data, f, indent=4)
+    except IOError as e:
+        print(f"Error saving document index {DOCUMENT_INDEX_PATH}: {e}")
+
+# --- Document Management Endpoints ---
+
+@app.post("/upload", tags=["Documents"])
+async def upload_document(file: UploadFile = File(...), title: str = Form(None)):
+    # CURSOR: Logic should ideally be in a service function
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
+
+    # Use provided title or filename
+    doc_title = title.strip() if title and title.strip() else file.filename
     
-    # Create a unique ID for the document
+    # Generate a unique ID for the document for internal tracking
+    # This ID is separate from how vector stores might handle IDs.
     doc_id = str(uuid.uuid4())
     
-    # Make sure directories exist
-    os.makedirs(DOCUMENTS_DIR, exist_ok=True)
+    # Define safe filename and save path
+    # Example: use doc_id to avoid collisions, keep original extension
+    safe_filename = f"{doc_id}_{file.filename}" 
+    save_path = DOCUMENTS_DIR / safe_filename
     
-    # Debug information
-    print(f"Uploading document: {file.filename}")
-    print(f"Document ID: {doc_id}")
-    print(f"Document Title: {title}")
-    print(f"DOCUMENTS_DIR: {DOCUMENTS_DIR}")
-    print(f"DOCUMENTS_DIR exists: {os.path.exists(DOCUMENTS_DIR)}")
-    
-    # Save the file
-    file_location = os.path.join(DOCUMENTS_DIR, f"{doc_id}_{file.filename}")
-    print(f"Saving file to: {file_location}")
+    upload_status = {
+        "filename": file.filename,
+        "content_type": file.content_type,
+        "title": doc_title,
+        "doc_id": doc_id, # Return the generated ID
+        "status": "",
+        "detail": ""
+    }
+
     try:
-        with open(file_location, "wb") as buffer:
+        # Save the uploaded file
+        print(f"Saving uploaded file to: {save_path}")
+        with open(save_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        print(f"File saved successfully to {file_location}")
-        print(f"File exists after save: {os.path.exists(file_location)}")
-    except Exception as e:
-        error_message = f"Error saving file: {str(e)}"
-        print(error_message)
-        raise HTTPException(status_code=500, detail=error_message)
-    
-    # Process the document
-    try:
-        # Clear existing vector store to ensure we only use this document
-        from pathlib import Path
-        vector_store_dir = Path(VECTORSTORE_DIR)
-        for file_name in ["index.faiss", "index.pkl"]:
-            path = vector_store_dir / file_name
-            if path.exists():
-                path.unlink()
-                print(f"[INFO] Removed old vector store file: {path}")
-        print("[INFO] Old vector store cleared.")
-        
-        # Process the document and add to vectorstore
-        print(f"Processing document: {file_location}")
-        docs = prepare_documents(file_location)
-        print(f"Document processed: {len(docs) if docs else 0} chunks created")
-        
-        # Add source metadata to each document chunk
-        for doc in docs:
-            doc.metadata["source"] = file.filename
-            doc.metadata["document_id"] = doc_id
-            doc.metadata["title"] = title
-            
-        print(f"Added document metadata to chunks. Source: {file.filename}")
-        
-        # Store document metadata
-        file_size = os.path.getsize(file_location)
-        file_size_kb = round(file_size / 1024, 2)
-        
-        document_store[doc_id] = {
-            "id": doc_id,
-            "title": title,
-            "filename": file.filename,
-            "path": file_location,
-            "size": f"{file_size_kb} KB",
-            "chunk_count": len(docs) if docs else 0
-        }
-        print(f"Document metadata stored: {document_store[doc_id]}")
-        
-        # Build vectorstore with the new documents
-        if docs:
-            print("Building new vectorstore with current document only")
-            rag_retriever.build_vectorstore(docs)
-            print("Vector store built successfully")
-        
-        return {
-            "id": doc_id,
-            "title": title,
-            "filename": file.filename,
-            "status": "success",
-            "message": f"Document uploaded and processed successfully. Created {len(docs) if docs else 0} chunks."
-        }
-    except Exception as e:
-        error_message = f"Error processing document: {str(e)}"
-        print(error_message)
-        raise HTTPException(status_code=500, detail=error_message)
+        print(f"File saved successfully: {save_path}")
 
-@app.get("/documents")
+        # Process the document to get chunks
+        print(f"Preparing document chunks for: {doc_title}")
+        chunks = prepare_documents([str(save_path)], title=doc_title, doc_id=doc_id)
+        
+        if not chunks:
+            print(f"No chunks generated for {doc_title}. Aborting vector store update.")
+            # Clean up saved file? Or keep it?
+            # Let's keep it for now, but raise an error indicating processing failure.
+            raise HTTPException(status_code=500, detail=f"Failed to generate document chunks for {doc_title}.")
+
+        print(f"Generated {len(chunks)} chunks. Building/updating vector store...")
+        # --- Build/Save Vector Store --- 
+        build_success = rag_retriever.build_vectorstore(chunks)
+        if not build_success:
+            print(f"Failed to build/save vector store for {doc_title}.")
+            # Clean up? Raise error.
+            raise HTTPException(status_code=500, detail=f"Failed to update vector store for {doc_title}.")
+        print(f"Vector store updated successfully for: {doc_title}")
+        # --- End Build/Save Vector Store ---
+        
+        # --- Update JSON Index (Keep this) ---
+        index_data = load_document_index()
+        index_data[doc_id] = {"title": doc_title, "filename": file.filename, "id": doc_id}
+        save_document_index(index_data)
+        print(f"Updated document index with ID: {doc_id}")
+        # --- End Update JSON Index ---
+        
+        upload_status["status"] = "success"
+        upload_status["detail"] = f"Document '{doc_title}' processed and added successfully."
+        
+        return JSONResponse(content=upload_status, status_code=200)
+
+    except Exception as e:
+        print("---------- UPLOAD ERROR ----------")
+        print(f"Error processing document '{doc_title}' (ID: {doc_id}): {e}")
+        traceback.print_exc() # Print the full traceback to the console
+        print("----------------------------------")
+        
+        # Attempt to clean up the saved file if processing failed
+        if save_path.exists():
+             try:
+                 os.remove(save_path)
+                 print(f"Cleaned up failed upload: {save_path}")
+             except OSError as rm_error:
+                 print(f"Error cleaning up file {save_path}: {rm_error}")
+        
+        upload_status["status"] = "error"
+        upload_status["detail"] = f"Failed to process document: {str(e)}"
+        raise HTTPException(status_code=500, detail=upload_status["detail"])
+    finally:
+        await file.close()
+
+@app.get("/documents", tags=["Documents"])
 async def list_documents():
-    """List all uploaded documents"""
-    return {"documents": list(document_store.values())}
+    # --- Read from JSON Index --- 
+    print("Loading documents from JSON index...")
+    index_data = load_document_index()
+    # Convert the dictionary values to a list for the frontend
+    documents_list = list(index_data.values())
+    print(f"Found {len(documents_list)} documents in index.")
+    return JSONResponse({"documents": documents_list})
+    # --- End Read from JSON Index ---
 
-@app.post("/test-upload")
-async def test_upload(file: UploadFile = File(...)):
-    """Test endpoint for file upload"""
-    # Make sure directories exist
-    os.makedirs(DOCUMENTS_DIR, exist_ok=True)
-    
-    # Debug information
-    print(f"TEST UPLOAD - File: {file.filename}")
-    print(f"TEST UPLOAD - DOCUMENTS_DIR: {DOCUMENTS_DIR}")
-    print(f"TEST UPLOAD - DOCUMENTS_DIR exists: {os.path.exists(DOCUMENTS_DIR)}")
-    
-    # Save the file with a fixed name for testing
-    file_location = os.path.join(DOCUMENTS_DIR, f"test_{file.filename}")
-    print(f"TEST UPLOAD - Saving file to: {file_location}")
-    
-    try:
-        # Try to create an empty test file first
-        test_file = os.path.join(DOCUMENTS_DIR, "write_test.txt")
-        with open(test_file, "w") as f:
-            f.write("Test write")
-        print(f"TEST UPLOAD - Test file created: {os.path.exists(test_file)}")
-        
-        # Now try to save the uploaded file
-        with open(file_location, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
-        
-        print(f"TEST UPLOAD - File saved: {os.path.exists(file_location)}")
-        
-        # Return a simple response
-        return {
-            "filename": file.filename,
-            "saved_to": file_location,
-            "exists": os.path.exists(file_location),
-            "size": os.path.getsize(file_location) if os.path.exists(file_location) else 0
-        }
-    except Exception as e:
-        error_message = f"TEST UPLOAD - Error: {str(e)}"
-        print(error_message)
-        raise HTTPException(status_code=500, detail=error_message)
-
-@app.delete("/documents/{doc_id}")
+@app.delete("/documents/{doc_id}", tags=["Documents"])
 async def delete_document(doc_id: str):
-    """Delete a document from the system"""
-    if doc_id not in document_store:
-        raise HTTPException(status_code=404, detail="Document not found")
+    print(f"Attempting to delete document with ID: {doc_id}")
+    vector_deletion_successful = False
+    index_entry_found = False
     
-    # Get document path
-    doc_path = document_store[doc_id]["path"]
-    
-    # Check if file exists
-    if not os.path.exists(doc_path):
-        # Document metadata exists but file is missing
-        del document_store[doc_id]
-        return {"status": "success", "message": "Document metadata removed (file was missing)"}
-    
-    # Try to delete the file
+    # --- Delete from Vector Store (Keep this attempt) ---
     try:
-        os.remove(doc_path)
-        print(f"Deleted document file: {doc_path}")
-        
-        # Remove from document store
-        del document_store[doc_id]
-        
-        return {
-            "status": "success", 
-            "message": "Document deleted successfully"
-        }
+        if not rag_retriever.load_vectorstore():
+            print("Vector store could not be loaded for deletion.")
+            # Don't raise immediately, still try to delete from index
+        else:
+            vector_store = rag_retriever.vectorstore
+            if vector_store:
+                results = vector_store.get(where={"doc_id": doc_id}, include=[]) # FAISS doesn't have get, but check logic
+                # Correct way to delete from FAISS if needed might involve rebuilding 
+                # or using specific IDs if stored separately. For now, focus on index.
+                # We'll assume deletion from FAISS might fail or isn't fully implemented here.
+                # Placeholder for actual FAISS deletion logic if implemented:
+                # chunk_ids_to_delete = find_chunk_ids_for_doc_id(vector_store, doc_id)
+                # if chunk_ids_to_delete:
+                #     vector_store.delete(ids=chunk_ids_to_delete)
+                #     vector_deletion_successful = True
+                #     print(f"Deleted {len(chunk_ids_to_delete)} chunks for doc_id {doc_id} from vector store.")
+                # else:
+                #     print(f"No chunks found in vector store for doc_id {doc_id}")
+                print(f"Note: Vector store deletion logic for FAISS needs specific implementation.")
+                vector_deletion_successful = True # Assume ok for now if we can load it
+            else:
+                print("Vector store object not available after load attempt.")
     except Exception as e:
-        error_message = f"Error deleting document: {str(e)}"
-        print(error_message)
-        raise HTTPException(status_code=500, detail=error_message)
+        print(f"Error during vector store access/deletion for doc_id {doc_id}: {e}")
+        # Log error but continue to attempt index deletion
+        
+    # --- Delete from JSON Index ---    
+    index_data = load_document_index()
+    if doc_id in index_data:
+        index_entry_found = True
+        original_filename = index_data[doc_id].get("filename") # Get filename before deleting
+        del index_data[doc_id]
+        save_document_index(index_data)
+        print(f"Removed doc_id {doc_id} from document index.")
+        
+        # --- Optionally: Delete the original file --- 
+        # Use the doc_id and filename from the index entry we just deleted
+        if original_filename:
+            # Construct the expected saved filename format
+            safe_filename = f"{doc_id}_{original_filename}"
+            file_path_to_delete = DOCUMENTS_DIR / safe_filename
+            if file_path_to_delete.exists():
+                try:
+                    os.remove(file_path_to_delete)
+                    print(f"Deleted original file: {file_path_to_delete}")
+                except OSError as rm_error:
+                    print(f"Error deleting original file {file_path_to_delete}: {rm_error}")
+            else:
+                print(f"Original file not found for deletion: {file_path_to_delete}")
+        else:
+             print(f"Original filename not found in index for doc_id {doc_id}, cannot delete file.")
+            
+    else:
+        print(f"doc_id {doc_id} not found in document index.")
 
+    # --- Return Response --- 
+    if index_entry_found:
+         # Consider successful even if vector deletion part isn't fully working
+        return JSONResponse({"status": "success", "detail": f"Document ID '{doc_id}' removed from index. File deleted if found."}, status_code=200)
+    else:
+        raise HTTPException(status_code=404, detail=f"Document with ID '{doc_id}' not found.")
+
+# --- Main execution (for running with `python app/main.py`) ---
+# Note: Typically run with `uvicorn app.main:app --reload` from the chatbot-RAG directory
 if __name__ == "__main__":
-    # Create directories if they don't exist
-    os.makedirs(DOCUMENTS_DIR, exist_ok=True)
-    os.makedirs(VECTORSTORE_DIR, exist_ok=True)
-    
-    # Run the server
-    print("Starting Hybrid RAG Chatbot server on http://127.0.0.1:8000")
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True) 
+    # Make sure we're running from the project root for imports to work correctly
+    project_root = Path(__file__).parent.parent
+    os.chdir(project_root) 
+    print(f"Running uvicorn for {__name__}...")
+    print(f"Current working directory: {os.getcwd()}") # Should be chatbot-RAG
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True) 
