@@ -73,30 +73,36 @@ chatbot/
 └── requirements.txt          # Project dependencies
 ```
 
+## Architecture Notes
+
+The application employs a standard RAG architecture:
+
+1.  **Frontend:** An HTML/JavaScript interface (served by FastAPI) allows users to upload PDFs and ask questions.
+2.  **Backend (FastAPI):** Handles API requests for document upload, listing, deletion, and question answering.
+3.  **Document Processing (`app/utils/file_loader.py`):** Extracts text from PDFs, splits it into chunks, and generates embeddings using Sentence Transformers (`all-MiniLM-L6-v2`).
+4.  **Vector Store (FAISS):** Stores the document chunk embeddings for efficient similarity search. The FAISS index (`index.faiss` and `index.pkl`) is saved locally in `data/vector_store/`.
+5.  **Retriever (`app/retrievers/rag.py`):** Takes a user's question, embeds it, and queries the FAISS vector store to find the most relevant document chunks (`k=5` by default).
+6.  **LLM Integration (`app/llm/ollama_runner.py`):** Sends the user's question along with the retrieved context chunks to an Ollama instance (running a model like Mistral) to generate a final answer. If Ollama is unavailable, it falls back to returning the raw retrieved context.
+7.  **Document Index (`data/document_index.json`):** A simple JSON file maintains a mapping between uploaded document metadata (title, filename) and a unique ID, used for listing and deleting documents.
+
+### Vector Store Deletion Handling
+
+A key challenge addressed during development was ensuring that deleting a document properly removed its context from the system.
+
+*   **Initial Problem:** The initial implementation of the document deletion endpoint (`DELETE /documents/{doc_id}`) successfully removed the document's entry from `document_index.json` and deleted the source PDF file. However, it did *not* remove the corresponding vector embeddings from the FAISS index file (`data/vector_store/index.faiss`). This meant that even after a document was "deleted", its content could still be retrieved and used in answers, leading to incorrect or irrelevant responses.
+
+*   **Fix Implemented:** The `DELETE /documents/{doc_id}` endpoint in `app/main.py` was modified to implement a "nuke and rebuild" strategy for the vector store upon deletion:
+    1.  The document entry is removed from `document_index.json`.
+    2.  The original PDF file is deleted from `data/documents/`.
+    3.  The system identifies all *remaining* documents based on the updated `document_index.json`.
+    4.  It re-processes all chunks for these remaining documents.
+    5.  A completely *new* FAISS index is built from scratch using only the chunks from the remaining documents. This new index overwrites the old `index.faiss` and `index.pkl` files.
+    6.  If no documents remain after deletion, the `index.faiss` and `index.pkl` files are explicitly deleted.
+    7.  The in-memory cache of the vector store (`rag_retriever.vectorstore`) is cleared to force a reload from the updated disk state on the next query.
+
+*   **Outcome:** This ensures the FAISS vector store always accurately reflects the currently indexed documents. Context from deleted documents is reliably removed, preventing outdated information from influencing search results and LLM responses.
+
 ## Testing
 
 Run the test script to verify the application functionality:
-```bash
-python test_rag.py
 ```
-
-This will:
-1. Create a test PDF document
-2. Upload it to the system
-3. Ask several test questions
-4. Clean up afterwards
-
-## Configuration
-
-Configuration options can be modified in `app/config.py`:
-- `LLM_MODEL_NAME`: The Ollama model to use (default: "mistral")
-- `OLLAMA_BASE_URL`: URL of the Ollama API (default: "http://localhost:11434")
-- `RETRIEVAL_K`: Number of documents to retrieve (default: 5)
-- `CHUNK_SIZE`: Size of document chunks (default: 500)
-- `CHUNK_OVERLAP`: Overlap between document chunks (default: 50)
-
-## Notes
-
-- The system will work with or without Ollama
-- When Ollama is not available, the system returns raw context from retrieved documents
-- The embedding model used is "all-MiniLM-L6-v2" from Sentence Transformers 

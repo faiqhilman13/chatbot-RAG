@@ -32,10 +32,13 @@ ENV/
 *.swo
 
 # Data files
-data/*.pdf
-data/*.csv
-data/*.json
-data/*.txt
+# Ignore contents of documents and vector store directories
+data/documents/*
+data/vector_store/*
+# Keep the document index tracked
+!data/document_index.json
+# Keep .gitkeep files tracked if used in empty dirs
+!data/**/.gitkeep
 
 # Environment variables
 .env

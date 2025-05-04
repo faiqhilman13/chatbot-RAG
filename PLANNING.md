@@ -98,4 +98,26 @@ The standalone frontend will be a simple, clean interface that allows users to:
 4. Ask questions about the uploaded documents
 5. View answers with source information
 
-The design will prioritize simplicity, usability, and responsiveness across devices. 
+The design will prioritize simplicity, usability, and responsiveness across devices.
+
+## Future Improvements / Next Steps
+
+Based on the current implementation, several areas offer potential for significant technical enhancement:
+
+1.  **Explore Advanced/Novel Techniques:** Move beyond the standard RAG pattern by investigating:
+    *   Alternative RAG architectures (e.g., ReAct, Self-Correction).
+    *   Different or fine-tuned embedding models.
+    *   Advanced retrieval strategies (hybrid search, re-ranking).
+    *   More sophisticated LLM prompting techniques.
+
+2.  **Optimize Deletion Efficiency:** Replace the current "nuke and rebuild" FAISS strategy:
+    *   Research and select a vector database with efficient, built-in ID-based deletion (e.g., ChromaDB, Qdrant, Weaviate, Milvus, potentially self-hosted).
+    *   Migrate the vector store implementation, including refactoring upload/deletion logic to use the new database's API.
+
+3.  **Enhance Scalability & Production Readiness:** Prepare the application for potentially larger scale or more robust deployment:
+    *   Implement asynchronous processing for document uploads/embeddings.
+    *   Containerize the application (Docker/Docker Compose).
+    *   Improve configuration management.
+    *   Add more comprehensive error handling and logging.
+    *   Address potential concurrency bottlenecks.
+    *   Integrate basic monitoring. 

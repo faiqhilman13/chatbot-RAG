@@ -136,14 +136,38 @@ async def upload_document(file: UploadFile = File(...), title: str = Form(None))
             raise HTTPException(status_code=500, detail=f"Failed to generate document chunks for {doc_title}.")
 
         print(f"Generated {len(chunks)} chunks. Building/updating vector store...")
-        # --- Build/Save Vector Store --- 
-        build_success = rag_retriever.build_vectorstore(chunks)
-        if not build_success:
-            print(f"Failed to build/save vector store for {doc_title}.")
-            # Clean up? Raise error.
-            raise HTTPException(status_code=500, detail=f"Failed to update vector store for {doc_title}.")
-        print(f"Vector store updated successfully for: {doc_title}")
-        # --- End Build/Save Vector Store ---
+        # --- Modify Vector Store Update Logic ---
+        vectorstore_updated = False
+        try:
+            # Attempt to load the existing store first
+            if rag_retriever.load_vectorstore():
+                print("Existing vector store loaded. Adding new documents...")
+                # Use the 'add_documents' method of the loaded FAISS store
+                rag_retriever.vectorstore.add_documents(chunks)
+                print(f"Added {len(chunks)} chunks to existing vector store.")
+                # Save the updated store
+                if rag_retriever.save_vectorstore():
+                    vectorstore_updated = True
+                else:
+                    print("Failed to save updated vector store.")
+            else:
+                # If no store exists, build a new one
+                print("No existing vector store found. Building new one...")
+                if rag_retriever.build_vectorstore(chunks): # build_vectorstore already saves
+                    vectorstore_updated = True
+                else:
+                    print("Failed to build new vector store.")
+
+            if not vectorstore_updated:
+                 raise HTTPException(status_code=500, detail=f"Failed to update or build vector store for {doc_title}.")
+            
+            print(f"Vector store updated successfully for: {doc_title}")
+
+        except Exception as vs_error:
+             print(f"Error during vector store operation: {vs_error}")
+             traceback.print_exc()
+             raise HTTPException(status_code=500, detail=f"Failed during vector store operation for {doc_title}: {vs_error}")
+        # --- End Modify Vector Store Update Logic ---
         
         # --- Update JSON Index (Keep this) ---
         index_data = load_document_index()
@@ -190,73 +214,135 @@ async def list_documents():
 
 @app.delete("/documents/{doc_id}", tags=["Documents"])
 async def delete_document(doc_id: str):
-    print(f"Attempting to delete document with ID: {doc_id}")
-    vector_deletion_successful = False
+    print(f"--- Starting Deletion Process for doc_id: {doc_id} ---")
     index_entry_found = False
-    
-    # --- Delete from Vector Store (Keep this attempt) ---
-    try:
-        if not rag_retriever.load_vectorstore():
-            print("Vector store could not be loaded for deletion.")
-            # Don't raise immediately, still try to delete from index
-        else:
-            vector_store = rag_retriever.vectorstore
-            if vector_store:
-                results = vector_store.get(where={"doc_id": doc_id}, include=[]) # FAISS doesn't have get, but check logic
-                # Correct way to delete from FAISS if needed might involve rebuilding 
-                # or using specific IDs if stored separately. For now, focus on index.
-                # We'll assume deletion from FAISS might fail or isn't fully implemented here.
-                # Placeholder for actual FAISS deletion logic if implemented:
-                # chunk_ids_to_delete = find_chunk_ids_for_doc_id(vector_store, doc_id)
-                # if chunk_ids_to_delete:
-                #     vector_store.delete(ids=chunk_ids_to_delete)
-                #     vector_deletion_successful = True
-                #     print(f"Deleted {len(chunk_ids_to_delete)} chunks for doc_id {doc_id} from vector store.")
-                # else:
-                #     print(f"No chunks found in vector store for doc_id {doc_id}")
-                print(f"Note: Vector store deletion logic for FAISS needs specific implementation.")
-                vector_deletion_successful = True # Assume ok for now if we can load it
-            else:
-                print("Vector store object not available after load attempt.")
-    except Exception as e:
-        print(f"Error during vector store access/deletion for doc_id {doc_id}: {e}")
-        # Log error but continue to attempt index deletion
-        
-    # --- Delete from JSON Index ---    
+    original_filename = None # Store filename for file deletion
+
+    # --- Load Index First ---
     index_data = load_document_index()
     if doc_id in index_data:
         index_entry_found = True
-        original_filename = index_data[doc_id].get("filename") # Get filename before deleting
+        original_filename = index_data[doc_id].get("filename") # Get filename
+        print(f"  [Delete] Found document '{index_data[doc_id].get('title', 'N/A')}' in index.")
+        # Remove from index immediately
         del index_data[doc_id]
         save_document_index(index_data)
-        print(f"Removed doc_id {doc_id} from document index.")
-        
-        # --- Optionally: Delete the original file --- 
-        # Use the doc_id and filename from the index entry we just deleted
-        if original_filename:
-            # Construct the expected saved filename format
-            safe_filename = f"{doc_id}_{original_filename}"
-            file_path_to_delete = DOCUMENTS_DIR / safe_filename
-            if file_path_to_delete.exists():
-                try:
-                    os.remove(file_path_to_delete)
-                    print(f"Deleted original file: {file_path_to_delete}")
-                except OSError as rm_error:
-                    print(f"Error deleting original file {file_path_to_delete}: {rm_error}")
-            else:
-                print(f"Original file not found for deletion: {file_path_to_delete}")
-        else:
-             print(f"Original filename not found in index for doc_id {doc_id}, cannot delete file.")
-            
+        print(f"  [Delete] Removed doc_id {doc_id} from document index.")
     else:
-        print(f"doc_id {doc_id} not found in document index.")
+        print(f"  [Delete] doc_id {doc_id} not found in document index.")
+        raise HTTPException(status_code=404, detail=f"Document with ID '{doc_id}' not found in index.")
 
-    # --- Return Response --- 
-    if index_entry_found:
-         # Consider successful even if vector deletion part isn't fully working
-        return JSONResponse({"status": "success", "detail": f"Document ID '{doc_id}' removed from index. File deleted if found."}, status_code=200)
+    # --- Delete the original file ---
+    file_deleted = False
+    if original_filename:
+        safe_filename = f"{doc_id}_{original_filename}"
+        file_path_to_delete = DOCUMENTS_DIR / safe_filename
+        print(f"  [Delete] Attempting to delete file: {file_path_to_delete}")
+        if file_path_to_delete.exists():
+            try:
+                os.remove(file_path_to_delete)
+                print(f"  [Delete] Successfully deleted original file: {file_path_to_delete}")
+                file_deleted = True
+            except OSError as rm_error:
+                print(f"  [Delete] Error deleting original file {file_path_to_delete}: {rm_error}")
+        else:
+            print(f"  [Delete] Original file not found for deletion: {file_path_to_delete}")
     else:
-        raise HTTPException(status_code=404, detail=f"Document with ID '{doc_id}' not found.")
+         print(f"  [Delete] Original filename not found in index for doc_id {doc_id}, cannot delete file.")
+
+    # --- Rebuild Vector Store ---
+    rebuild_successful = False
+    print("  [Delete] Rebuilding vector store from remaining documents...")
+    try:
+        remaining_docs_info = list(index_data.values()) # Use the updated index_data
+        print(f"  [Delete] Found {len(remaining_docs_info)} remaining documents in index.")
+
+        if remaining_docs_info:
+            all_remaining_chunks = []
+            print("  [Delete] Processing remaining documents for chunks...")
+            for doc_info in remaining_docs_info:
+                if "id" in doc_info and "filename" in doc_info:
+                    remaining_safe_filename = f"{doc_info['id']}_{doc_info['filename']}"
+                    path = str(DOCUMENTS_DIR / remaining_safe_filename)
+                    print(f"    [Delete] Checking remaining file: {path}")
+                    if os.path.exists(path):
+                       print(f"      [Delete] Processing chunks for: {path}")
+                       chunks = prepare_documents([path], title=doc_info.get("title"), doc_id=doc_info["id"])
+                       if chunks:
+                           all_remaining_chunks.extend(chunks)
+                           print(f"      [Delete] Added {len(chunks)} chunks.")
+                       else:
+                           print(f"      [Delete] Warning: No chunks generated for remaining file {path}")
+                    else:
+                         print(f"    [Delete] Skipping non-existent file for rebuild: {path}")
+                else:
+                     print(f"    [Delete] Warning: Incomplete info for a remaining document: {doc_info}")
+
+            if all_remaining_chunks:
+                print(f"  [Delete] Building new vector store with {len(all_remaining_chunks)} total chunks.")
+                # Ensure vectorstore directory exists
+                VECTORSTORE_DIR.mkdir(parents=True, exist_ok=True)
+                rebuild_successful = rag_retriever.build_vectorstore(all_remaining_chunks)
+                if rebuild_successful:
+                    print("  [Delete] Vector store rebuilt successfully.")
+                else:
+                    print("  [Delete] Failed to rebuild vector store.")
+            else:
+                 print("  [Delete] No valid remaining documents or chunks generated. Clearing vector store.")
+                 try:
+                     faiss_path = VECTORSTORE_DIR / "index.faiss"
+                     pkl_path = VECTORSTORE_DIR / "index.pkl"
+                     print(f"  [Delete] Attempting to remove existing store files: {faiss_path}, {pkl_path}")
+                     if faiss_path.exists():
+                         os.remove(faiss_path)
+                         print("    [Delete] Removed index.faiss")
+                     if pkl_path.exists():
+                         os.remove(pkl_path)
+                         print("    [Delete] Removed index.pkl")
+                     rebuild_successful = True
+                 except Exception as clear_error:
+                     print(f"  [Delete] Error clearing vector store files: {clear_error}")
+                     rebuild_successful = False
+        else: # No documents left in the index
+            print("  [Delete] No documents left in index. Clearing vector store.")
+            try:
+                faiss_path = VECTORSTORE_DIR / "index.faiss"
+                pkl_path = VECTORSTORE_DIR / "index.pkl"
+                print(f"  [Delete] Attempting to remove existing store files: {faiss_path}, {pkl_path}")
+                if faiss_path.exists():
+                    os.remove(faiss_path)
+                    print("    [Delete] Removed index.faiss")
+                if pkl_path.exists():
+                    os.remove(pkl_path)
+                    print("    [Delete] Removed index.pkl")
+                rebuild_successful = True
+            except Exception as clear_error:
+                print(f"  [Delete] Error clearing vector store files: {clear_error}")
+                rebuild_successful = False
+
+        # Clear the in-memory vectorstore instance in the retriever
+        rag_retriever.vectorstore = None
+        print("  [Delete] Cleared in-memory vector store instance.")
+
+    except Exception as e:
+        print(f"  [Delete] Error during vector store rebuild for deletion of {doc_id}: {e}")
+        traceback.print_exc()
+        rebuild_successful = False
+
+    # --- Return Response ---
+    detail_message = f"Document ID '{doc_id}' removed from index."
+    if file_deleted:
+        detail_message += " Original file deleted."
+    else:
+        detail_message += " Original file not found or deletion failed."
+
+    if rebuild_successful:
+        detail_message += " Vector store rebuilt/cleared."
+    else:
+        detail_message += " Vector store rebuild failed."
+
+    print(f"--- Finished Deletion Process for doc_id: {doc_id} ---")
+    return JSONResponse({"status": "success", "detail": detail_message}, status_code=200)
 
 # --- Main execution (for running with `python app/main.py`) ---
 # Note: Typically run with `uvicorn app.main:app --reload` from the chatbot-RAG directory
