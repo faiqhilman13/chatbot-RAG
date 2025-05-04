@@ -42,6 +42,17 @@ async def ask_question(request: QuestionRequest):
     
     relevant_docs: List[Document] = rag_retriever.retrieve_context(question=question)
     
+    print(f"[DEBUG] Retrieved {len(relevant_docs)} chunks. Details:")
+    if relevant_docs:
+        for i, doc in enumerate(relevant_docs):
+            source = doc.metadata.get("source", "N/A")
+            title = doc.metadata.get("title", "N/A")
+            page = doc.metadata.get("page", "N/A")
+            content_snippet = doc.page_content[:100].replace("\n", " ") + "..."
+            print(f"  - Chunk {i}: Source='{source}', Title='{title}', Page={page}, Content='{content_snippet}'")
+    else:
+        print("  - No relevant chunks found.")
+    
     if not relevant_docs:
         return QuestionResponse(
             question=question,

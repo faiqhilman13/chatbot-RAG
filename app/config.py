@@ -36,4 +36,4 @@ OLLAMA_BASE_URL = "http://localhost:11434"
 # Retrieval settings
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
-RETRIEVAL_K = 5  # Number of documents to retrieve 
+RETRIEVAL_K = 10  # Number of documents to retrieve 
