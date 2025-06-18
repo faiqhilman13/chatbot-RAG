@@ -19,7 +19,9 @@ const DocumentsPage = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/documents');
+      const response = await fetch('http://127.0.0.1:8001/documents', {
+        credentials: 'include'
+      });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Failed to fetch documents.' }));
         throw new Error(errorData.detail || `HTTP error ${response.status}`);

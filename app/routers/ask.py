@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Depends
 from app.utils.file_loader import get_all_documents
 from app.retrievers.rag import rag_retriever
 from app.llm.ollama_runner import ollama_runner
 from app.config import DOCUMENTS_DIR
+from app.auth import require_auth
 import os
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
@@ -25,7 +26,7 @@ class QuestionResponse(BaseModel):
     sources: List[SourceDocument]
 
 @router.post("/ask", response_model=QuestionResponse)
-async def ask_question(request: Request):
+async def ask_question(request: Request, current_user: str = Depends(require_auth)):
     """Ask a question and get an answer using RAG"""
     # Parse request body
     body = await request.json()
@@ -91,7 +92,7 @@ async def ask_question(request: Request):
     )
 
 @router.post("/upload_and_process")
-async def upload_and_process(file_path: str):
+async def upload_and_process(file_path: str, current_user: str = Depends(require_auth)):
     """Add a document to the vectorstore from a path"""
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail=f"File not found: {file_path}")

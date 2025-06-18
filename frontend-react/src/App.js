@@ -5,11 +5,13 @@ import { StagewiseToolbar } from '@stagewise/toolbar-react';
 import { ReactPlugin } from '@stagewise-plugins/react';
 import { PageProvider, usePage, PAGES } from './context/PageContext';
 import { ChatProvider } from './context/ChatContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Import pages
 import ChatPage from './pages/ChatPage';
 import DocumentsPage from './pages/DocumentsPage';
 import UploadPage from './pages/UploadPage';
+import LoginPage from './pages/LoginPage';
 
 // Main content component that renders the active page
 const MainContent = () => {
@@ -42,7 +44,22 @@ const MainContent = () => {
   );
 };
 
-function App() {
+// Component that handles auth state
+const AppContent = () => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
   return (
     <PageProvider>
       <ChatProvider>
@@ -53,6 +70,14 @@ function App() {
         </div>
       </ChatProvider>
     </PageProvider>
+  );
+};
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

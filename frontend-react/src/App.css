@@ -75,4 +75,29 @@
     margin-left: var(--sidebar-width);
     width: calc(100% - var(--sidebar-width));
   }
+}
+
+/* Loading screen styles */
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--main-bg-color);
+}
+
+.loading-spinner {
+  color: var(--neon-blue);
+  font-size: 18px;
+  font-weight: 500;
+  animation: pulse 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.6;
+  }
+  to {
+    opacity: 1;
+  }
 } 

@@ -9,4 +9,9 @@ python-multipart
 httpx
 transformers
 torch
-langchain_core 
+langchain_core
+passlib[bcrypt]
+python-jose[cryptography]
+itsdangerous
+pytest
+pytest-asyncio 

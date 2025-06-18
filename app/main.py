@@ -1,7 +1,8 @@
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 import uvicorn
 import os
 import shutil
@@ -9,10 +10,11 @@ import uuid
 from pathlib import Path
 import sys # Add import for sys
 import json # Add import for json
-from app.routers import ask
+from app.routers import ask, auth
 from app.config import DOCUMENTS_DIR, VECTORSTORE_DIR, BASE_DIR # Import BASE_DIR
 from app.retrievers.rag import rag_retriever
 from app.utils.file_loader import prepare_documents
+from app.auth import require_auth, optional_auth
 import traceback # Add import for traceback module
 
 # CURSOR: This file should only handle route wiring, not business logic.
@@ -21,16 +23,20 @@ import traceback # Add import for traceback module
 # Create FastAPI app
 app = FastAPI(title="Hybrid RAG Chatbot")
 
+# Add session middleware (must be added before other middleware that uses sessions)
+app.add_middleware(SessionMiddleware, secret_key="your-secret-key-change-in-production")
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allows all origins (adjust for production)
+    allow_origins=["http://localhost:5170"], # Specific frontend origin for credentials
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Include API routers
+app.include_router(auth.router)
 app.include_router(ask.router)
 
 # --- Define frontend path ---
@@ -92,7 +98,11 @@ def save_document_index(index_data):
 # --- Document Management Endpoints ---
 
 @app.post("/upload", tags=["Documents"])
-async def upload_document(file: UploadFile = File(...), title: str = Form(None)):
+async def upload_document(
+    file: UploadFile = File(...), 
+    title: str = Form(None),
+    current_user: str = Depends(require_auth)
+):
     # CURSOR: Logic should ideally be in a service function
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
@@ -202,7 +212,7 @@ async def upload_document(file: UploadFile = File(...), title: str = Form(None))
         await file.close()
 
 @app.get("/documents", tags=["Documents"])
-async def list_documents():
+async def list_documents(current_user: str = Depends(require_auth)):
     # --- Read from JSON Index --- 
     print("Loading documents from JSON index...")
     index_data = load_document_index()
@@ -213,7 +223,7 @@ async def list_documents():
     # --- End Read from JSON Index ---
 
 @app.delete("/documents/{doc_id}", tags=["Documents"])
-async def delete_document(doc_id: str):
+async def delete_document(doc_id: str, current_user: str = Depends(require_auth)):
     print(f"--- Starting Deletion Process for doc_id: {doc_id} ---")
     index_entry_found = False
     original_filename = None # Store filename for file deletion
@@ -352,4 +362,4 @@ if __name__ == "__main__":
     os.chdir(project_root) 
     print(f"Running uvicorn for {__name__}...")
     print(f"Current working directory: {os.getcwd()}") # Should be chatbot-RAG
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True) 
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8001, reload=True) 

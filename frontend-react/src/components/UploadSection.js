@@ -36,8 +36,9 @@ const UploadSection = ({ className, onDocumentUploaded }) => {
     setIsUploading(true);
 
     try {
-      const response = await fetch('/upload', {
+      const response = await fetch('http://127.0.0.1:8001/upload', {
         method: 'POST',
+        credentials: 'include',
         body: formData
       });
 

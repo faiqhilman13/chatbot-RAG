@@ -13,8 +13,9 @@ const DocumentsSection = ({ className, documents, isLoading, error, onRefresh, o
     setDeletingIds(prev => new Set(prev).add(docId));
 
     try {
-      const response = await fetch(`/documents/${docId}`, {
-        method: 'DELETE'
+      const response = await fetch(`http://127.0.0.1:8001/documents/${docId}`, {
+        method: 'DELETE',
+        credentials: 'include'
       });
 
       const result = await response.json();
