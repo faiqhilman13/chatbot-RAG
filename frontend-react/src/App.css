@@ -18,9 +18,61 @@
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
 
+.card-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 800px;
+  padding-bottom: 30px;
+}
+
+/* Add margin-left to the main content to account for fixed sidebar */
+.main-content-wrapper {
+  margin-left: var(--sidebar-width);
+  width: calc(100% - var(--sidebar-width));
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  transition: margin-left 0.3s ease, width 0.3s ease;
+}
+
+/* When chat sidebar is visible, adjust main content */
+.main-content-wrapper.with-chat-sidebar {
+  margin-left: calc(var(--sidebar-width) + 250px);
+  width: calc(100% - var(--sidebar-width) - 250px);
+}
+
+.main-content {
+  width: 100%;
+  min-height: 100vh;
+}
+
 /* Responsive adjustments */
+@media (max-width: 1100px) {
+  .main-content-wrapper.with-chat-sidebar {
+    margin-left: calc(var(--sidebar-width) + 200px);
+    width: calc(100% - var(--sidebar-width) - 200px);
+  }
+}
+
 @media (max-width: 960px) {
   .container {
     grid-template-columns: 1fr; /* Stack columns */
+  }
+  
+  .main-content {
+    padding: 10px;
+  }
+  
+  .card-container {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content-wrapper.with-chat-sidebar {
+    margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
   }
 } 

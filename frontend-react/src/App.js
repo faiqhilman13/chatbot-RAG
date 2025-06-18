@@ -1,63 +1,58 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import './App.css';
-import UploadSection from './components/UploadSection';
-import DocumentsSection from './components/DocumentsSection';
-import ChatSection from './components/ChatSection';
+import Sidebar from './components/Sidebar';
 import { StagewiseToolbar } from '@stagewise/toolbar-react';
 import { ReactPlugin } from '@stagewise-plugins/react';
+import { PageProvider, usePage, PAGES } from './context/PageContext';
+import { ChatProvider } from './context/ChatContext';
 
-function App() {
-  const [documents, setDocuments] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+// Import pages
+import ChatPage from './pages/ChatPage';
+import DocumentsPage from './pages/DocumentsPage';
+import UploadPage from './pages/UploadPage';
 
-  // Load documents when the component mounts
-  useEffect(() => {
-    loadDocuments();
-  }, []);
+// Main content component that renders the active page
+const MainContent = () => {
+  const { activePage } = usePage();
 
-  const loadDocuments = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/documents');
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Failed to fetch documents.' }));
-        throw new Error(errorData.detail || `HTTP error ${response.status}`);
-      }
-      const result = await response.json();
-      setDocuments(result.documents || []);
-    } catch (error) {
-      console.error('Error loading documents:', error);
-      setError(`Error loading documents: ${error.message}`);
-    } finally {
-      setIsLoading(false);
+  const renderActivePage = () => {
+    switch (activePage) {
+      case PAGES.CHAT:
+        return <ChatPage />;
+      case PAGES.DOCUMENTS:
+        return <DocumentsPage />;
+      case PAGES.UPLOAD:
+        return <UploadPage />;
+      default:
+        return <ChatPage />;
     }
   };
 
-  const handleDocumentDelete = async (docId) => {
-    // Filter out the deleted document from state
-    setDocuments(documents.filter(doc => doc.id !== docId));
-  };
+  // Add the with-chat-sidebar class when on the chat page
+  const contentClass = activePage === PAGES.CHAT 
+    ? "main-content-wrapper with-chat-sidebar" 
+    : "main-content-wrapper";
 
   return (
-    <div className="App">
-      <StagewiseToolbar config={{ plugins: [ReactPlugin] }} />
-      <h1>Hybrid RAG Chatbot</h1>
-      <div className="container">
-        <div className="sidebar">
-          <UploadSection onDocumentUploaded={loadDocuments} />
-          <DocumentsSection 
-            documents={documents} 
-            isLoading={isLoading} 
-            error={error} 
-            onRefresh={loadDocuments}
-            onDelete={handleDocumentDelete}
-          />
-        </div>
-        <ChatSection />
+    <div className={contentClass}>
+      <div className="main-content">
+        {renderActivePage()}
       </div>
     </div>
+  );
+};
+
+function App() {
+  return (
+    <PageProvider>
+      <ChatProvider>
+        <div className="App">
+          <StagewiseToolbar config={{ plugins: [ReactPlugin] }} />
+          <Sidebar />
+          <MainContent />
+        </div>
+      </ChatProvider>
+    </PageProvider>
   );
 }
 

@@ -1,0 +1,70 @@
+.chat-page {
+  width: 100%;
+  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 20px;
+  gap: 24px; /* Add consistent spacing between elements */
+  min-height: 100vh;
+  overflow-y: auto; /* Make the entire page scrollable */
+  padding-bottom: 100px; /* Add space at the bottom for the input box */
+}
+
+/* When chat sidebar is visible, adjust the layout */
+.chat-page.with-sidebar {
+  margin-left: 0;
+}
+
+.chat-page-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+
+.chat-page h1 {
+  margin-bottom: 0; /* Remove default margin to use gap instead */
+  color: #c27cb9; /* More purple-ish color like in the screenshot */
+  text-shadow: 0 0 10px rgba(194, 124, 185, 0.5);
+}
+
+.welcome-text {
+  margin-bottom: 0; /* Remove default margin to use gap instead */
+}
+
+.chat-card {
+  width: 100%;
+  margin-bottom: 0; /* Remove default margin to use gap instead */
+  padding: 0; /* Remove padding as messages will have their own padding */
+  background: transparent; /* Make the card transparent */
+  border: none; /* Remove border */
+  box-shadow: none; /* Remove shadow */
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+/* Ensure the chat section has proper width */
+.chat-page .chat-section {
+  width: 100%;
+  flex-grow: 1;
+}
+
+/* Show scrollbar for the chat page */
+.chat-page::-webkit-scrollbar {
+  display: block;
+}
+
+/* Mobile responsiveness for chat page with sidebar */
+@media (max-width: 768px) {
+  .main-content-wrapper.with-chat-sidebar {
+    margin-left: var(--sidebar-width);
+    width: calc(100% - var(--sidebar-width));
+  }
+  
+  .chat-page.with-sidebar {
+    margin-left: 0;
+  }
+} 

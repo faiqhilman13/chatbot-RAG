@@ -2,8 +2,11 @@ fastapi
 uvicorn
 langchain
 langchain_community
-sentence-transformers
+sentence-transformers>=2.2.2
 faiss-cpu
 pypdf
 python-multipart
-httpx 
+httpx
+transformers
+torch
+langchain_core 

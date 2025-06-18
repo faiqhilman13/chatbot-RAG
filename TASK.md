@@ -2,16 +2,27 @@
 
 ## Current Tasks (2024-07)
 
-- [ ] **Improve RAG Accuracy**
-  - [ ] Replace embedding model with mxbai-embed-large
-  - [ ] Implement cross-encoder reranking
+- [x] **Improve RAG Accuracy**
+  - [x] Replace embedding model with BAAI/bge-large-en-v1.5 (upgraded from all-MiniLM-L6-v2)
+  - [x] Implement cross-encoder reranking using cross-encoder/ms-marco-MiniLM-L-6-v2
+  - [x] Change LLM model from mistral to llama3:8b
   - [ ] Benchmark and evaluate performance improvements
 - [ ] **Frontend Improvements**
   - [x] Integrate Stagewise toolbar for AI-powered UI editing
   - [x] Reduce visual intensity of UI elements (scrollbar and heading glow effects)
-  - [ ] Create simplified standalone frontend with clean, minimalist UI
-  - [ ] Implement mobile-responsive design
+  - [x] Create React.js frontend with component-based architecture
+  - [x] Implement mobile-responsive design
+  - [x] Implement sidebar navigation with separate pages for chat, documents, and upload
+  - [x] Create clean main chat page with only chat interface
+  - [x] Create separate document management page
+  - [x] Create separate upload page
   - [ ] Add better error handling and user feedback
+  - [ ] **Implement Chat History Persistence**
+    - [ ] Create chat history sidebar in chat page
+    - [ ] Store chat messages in local storage
+    - [ ] Allow users to navigate between different chat sessions
+    - [ ] Add functionality to create new chat sessions
+    - [ ] Add functionality to delete chat sessions
 - [ ] **Code Quality & Testing**
   - [ ] Add comprehensive logging
   - [ ] Add unit tests for all components
@@ -21,10 +32,37 @@
 
 ## In Progress
 
-- [ ] Implement advanced embedding model and reranking
-- [ ] Test end-to-end functionality with improved RAG pipeline
+- [ ] Add better error handling and user feedback
+  - [ ] Add toast notifications for success/error messages
+  - [ ] Improve form validation
+  - [ ] Add loading indicators
+- [ ] **Implement Chat History Persistence**
+  - [ ] Create chat history sidebar in chat page
+  - [ ] Store chat messages in local storage
+  - [ ] Allow users to navigate between different chat sessions
+  - [ ] Add functionality to create new chat sessions
+  - [ ] Add functionality to delete chat sessions
 
 ## Completed Tasks
+
+### 2024-07-19
+- [x] Create sidebar layout with icon-only navigation
+- [x] Implement responsive centered card layout
+- [x] Maintain dark neon theme styling
+- [x] Implement page routing system with context
+- [x] Implement active state for sidebar buttons
+- [x] Create chat-only main page
+- [x] Move document upload to separate page
+- [x] Move document library to separate page
+- [x] Add navigation between pages
+
+### 2024-07-18
+- [x] Replace embedding model with BAAI/bge-large-en-v1.5
+- [x] Implement cross-encoder reranking with cross-encoder/ms-marco-MiniLM-L-6-v2
+- [x] Change LLM model from mistral to llama3:8b
+- [x] Configure two-stage retrieval process (20 initial candidates → 5 after reranking)
+- [x] Create React.js frontend with component-based architecture
+- [x] Configure React frontend to run on port 5170
 
 ### 2024-07-17
 - [x] Integrate Stagewise toolbar for AI-powered UI editing
@@ -59,7 +97,8 @@
 - The system should work with or without Ollama being available
 - When Ollama is not available, the system will return raw context from retrieved documents
 - All errors should be handled gracefully with user-friendly messages
-- The new simplified frontend should be separate from the embedded HTML UI for easier maintenance
+- The new React.js frontend should provide better code organization and maintainability while preserving the original design aesthetic
+- The UI should have separate pages for chat, document management, and uploads, accessible via the sidebar navigation
 
 ## Future Enhancements
 

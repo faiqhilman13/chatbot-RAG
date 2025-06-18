@@ -1,11 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useChat } from '../context/ChatContext';
 import './ChatSection.css';
 
-const ChatSection = () => {
-  const [messages, setMessages] = useState([]);
+const ChatSection = ({ className }) => {
   const [question, setQuestion] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const chatContainerRef = useRef(null);
+  const { 
+    activeChat, 
+    addMessage, 
+    isLoading, 
+    setIsLoading, 
+    createNewChat 
+  } = useChat();
+
+  // Get messages from active chat or empty array if no active chat
+  const messages = activeChat ? activeChat.messages : [];
 
   // Scroll to bottom of chat container when messages change
   useEffect(() => {
@@ -22,6 +31,31 @@ const ChatSection = () => {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  };
+
+  // Function to format AI responses with basic markdown-like formatting
+  const formatAIResponse = (text) => {
+    if (!text) return '';
+    
+    // Replace line breaks with <br> tags
+    let formatted = text.replace(/\n/g, '<br>');
+    
+    // Format headings (# Heading)
+    formatted = formatted.replace(/(?:<br>|^)#\s+(.*?)(?:<br>|$)/g, '<h2>$1</h2>');
+    
+    // Format bold text (**text**)
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // Format italic text (*text*)
+    formatted = formatted.replace(/\*([^*<>]+)\*/g, '<em>$1</em>');
+    
+    // Format inline code (`code`)
+    formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+    
+    // Format bullet points
+    formatted = formatted.replace(/(?:<br>|^)\s*-\s+(.*?)(?:<br>|$)/g, '<br>• $1<br>');
+    
+    return formatted;
   };
 
   const handleQuestionChange = (e) => {
@@ -44,7 +78,7 @@ const ChatSection = () => {
       type: 'user',
       content: question.trim(),
     };
-    setMessages([...messages, userMessage]);
+    addMessage(userMessage);
     
     // Clear input and set loading state
     setQuestion('');
@@ -71,7 +105,7 @@ const ChatSection = () => {
         content: result.answer,
         sources: result.sources || []
       };
-      setMessages(messages => [...messages, botMessage]);
+      addMessage(botMessage);
     } catch (error) {
       console.error('Ask error:', error);
       const errorMessage = {
@@ -79,26 +113,37 @@ const ChatSection = () => {
         content: `Sorry, there was an error: ${error.message}`,
         error: true
       };
-      setMessages(messages => [...messages, errorMessage]);
+      addMessage(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleNewChat = () => {
+    createNewChat();
+  };
+
   return (
-    <div className="section chat-section">
-      <h2>Chat</h2>
+    <div className={`chat-section ${className || ''}`}>
       <div className="chat-container" ref={chatContainerRef}>
+        {messages.length === 0 && (
+          <div className="empty-chat-message">
+            Your conversation will appear here. Ask a question about your documents to get started.
+          </div>
+        )}
         {messages.map((message, index) => (
           <div 
             key={index} 
             className={`chat-message ${message.type === 'user' ? 'chat-question' : 'chat-answer'}`}
           >
             {message.type === 'user' ? (
-              message.content
+              <div>{message.content}</div>
             ) : (
               <>
-                <pre>{message.content}</pre>
+                <div 
+                  className="chat-answer-content"
+                  dangerouslySetInnerHTML={{ __html: formatAIResponse(message.content) }}
+                />
                 {message.sources && message.sources.length > 0 && (
                   <div className="sources">
                     <strong>Sources:</strong><br />
@@ -119,7 +164,7 @@ const ChatSection = () => {
           value={question}
           onChange={handleQuestionChange}
           onKeyDown={handleKeyDown}
-          placeholder="Ask a question about the uploaded documents..."
+          placeholder="Ask me anything..."
           disabled={isLoading}
         />
         <button 

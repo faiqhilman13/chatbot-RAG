@@ -2,6 +2,21 @@
 
 This document provides diagrams illustrating the key workflows of the Hybrid RAG Chatbot application.
 
+## Recent Improvements (July 2024)
+
+The RAG system has been enhanced with several improvements to increase accuracy and performance:
+
+1. **Advanced Embedding Model**: Replaced the original `all-MiniLM-L6-v2` embedding model with `BAAI/bge-large-en-v1.5`, which provides more accurate semantic representations of text.
+
+2. **Cross-Encoder Reranking**: Added a two-stage retrieval process:
+   - First stage: Retrieve a larger set of candidate chunks (20 by default) using vector similarity
+   - Second stage: Rerank these candidates using the `cross-encoder/ms-marco-MiniLM-L-6-v2` model
+   - Return only the top k (5 by default) most relevant chunks after reranking
+
+3. **Updated LLM Model**: Now using `llama3:8b` from Ollama for generating responses, replacing the previous `mistral` model.
+
+These improvements significantly enhance the quality of retrieved context and the accuracy of generated answers.
+
 ## Document Upload Flow
 
 This diagram shows the sequence of events when a user uploads a PDF document.
@@ -20,7 +35,7 @@ sequenceDiagram
     Frontend->>Backend: POST /upload (file, title)
     Backend->>FileLoader: prepare_documents(pdf_path, title, doc_id)
     FileLoader->>FileLoader: Extract Text & Chunk
-    FileLoader->>FileLoader: Generate Embeddings (SentenceTransformer)
+    FileLoader->>FileLoader: Generate Embeddings (BAAI/bge-large-en-v1.5)
     FileLoader-->>Backend: Return chunks (List[Document])
     Backend->>RAGRetriever: load_vectorstore()
     RAGRetriever->>FAISS_Store: Load index.faiss/pkl (if exists)
@@ -48,7 +63,7 @@ sequenceDiagram
 
 ## Question Answering Flow
 
-This diagram shows the sequence for answering a user's question.
+This diagram shows the enhanced sequence for answering a user's question with cross-encoder reranking.
 
 ```mermaid
 sequenceDiagram
@@ -57,8 +72,9 @@ sequenceDiagram
     participant Backend (FastAPI)
     participant RAGRetriever
     participant FAISS_Store
+    participant CrossEncoder
     participant OllamaRunner
-    participant LLM (Ollama)
+    participant LLM (llama3:8b)
 
     User->>Frontend: Enters question, Clicks Ask
     Frontend->>Backend: POST /ask (question)
@@ -67,16 +83,19 @@ sequenceDiagram
     FAISS_Store-->>RAGRetriever: Vector store instance
     RAGRetriever-->>Backend: Store loaded
     Backend->>RAGRetriever: retrieve_context(question)
-    RAGRetriever->>RAGRetriever: Embed question
-    RAGRetriever->>FAISS_Store: Similarity search with question embedding
-    FAISS_Store-->>RAGRetriever: Relevant chunk embeddings + metadata
-    RAGRetriever->>RAGRetriever: Reconstruct Document objects
-    RAGRetriever-->>Backend: List[Document] (relevant chunks)
+    RAGRetriever->>RAGRetriever: Embed question with BAAI/bge-large-en-v1.5
+    RAGRetriever->>FAISS_Store: Similarity search for 20 candidates
+    FAISS_Store-->>RAGRetriever: Candidate chunk embeddings + metadata
+    RAGRetriever->>CrossEncoder: Rerank candidates with question
+    CrossEncoder->>CrossEncoder: Score (question, chunk) pairs
+    CrossEncoder-->>RAGRetriever: Reranked candidates with scores
+    RAGRetriever->>RAGRetriever: Select top 5 chunks after reranking
+    RAGRetriever-->>Backend: List[Document] (most relevant chunks)
     Backend->>Backend: Format context string from documents
     Backend->>OllamaRunner: get_answer_from_context(question, context)
     OllamaRunner->>OllamaRunner: Create prompt template
-    OllamaRunner->>LLM (Ollama): Send formatted prompt (question + context)
-    LLM (Ollama)-->>OllamaRunner: Generated answer string
+    OllamaRunner->>LLM (llama3:8b): Send formatted prompt (question + context)
+    LLM (llama3:8b)-->>OllamaRunner: Generated answer string
     OllamaRunner-->>Backend: Answer string
     Backend->>Backend: Format response (answer, sources)
     Backend-->>Frontend: JSON Response (question, answer, sources)
@@ -132,4 +151,26 @@ sequenceDiagram
     RAGRetriever-->>Backend: Cache cleared
     Backend-->>Frontend: Success Response
     Frontend-->>User: Update document list / Show confirmation
-``` 
+```
+
+## System Architecture Overview
+
+The enhanced RAG system now follows this process:
+
+1. **Document Processing**:
+   - PDF documents are processed page by page and split into chunks
+   - Each chunk maintains metadata including source file, page number, and document ID
+   - Chunks are embedded using the BAAI/bge-large-en-v1.5 model for higher quality representations
+
+2. **Two-Stage Retrieval**:
+   - When a question is asked, it's embedded using the same BAAI/bge-large-en-v1.5 model
+   - First stage: Retrieve 20 candidate chunks using vector similarity search in FAISS
+   - Second stage: Rerank these candidates using the cross-encoder/ms-marco-MiniLM-L-6-v2 model
+   - Return only the top 5 most relevant chunks after reranking
+
+3. **Answer Generation**:
+   - The selected chunks are combined to form the context
+   - The llama3:8b model from Ollama generates an answer based on the question and context
+   - The answer is returned to the user along with source information
+
+This two-stage retrieval process significantly improves the quality of retrieved context and the accuracy of generated answers compared to simple vector similarity search alone. 

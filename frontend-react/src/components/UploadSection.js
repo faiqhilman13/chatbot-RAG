@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './UploadSection.css';
 
-const UploadSection = ({ onDocumentUploaded }) => {
+const UploadSection = ({ className, onDocumentUploaded }) => {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState({ message: '', type: '' });
@@ -68,7 +68,7 @@ const UploadSection = ({ onDocumentUploaded }) => {
   };
 
   return (
-    <div className="section upload-section">
+    <div className={`upload-section ${className || ''}`}>
       <h2>Upload PDF Document</h2>
       <p>Upload PDF documents to build the knowledge base.</p>
       <form onSubmit={handleSubmit}>

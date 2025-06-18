@@ -1,5 +1,5 @@
 from langchain_community.vectorstores import FAISS
-from app.config import EMBEDDING_MODEL, VECTORSTORE_DIR, RETRIEVAL_K
+from app.config import EMBEDDING_MODEL, VECTORSTORE_DIR, RETRIEVAL_K, RETRIEVAL_CANDIDATES, CROSS_ENCODER_MODEL
 import os
 import pickle
 from typing import List, Tuple, Optional, Dict, Any
@@ -11,6 +11,7 @@ class RAGRetriever:
         self.vectorstore = None
         self.embedding_model = EMBEDDING_MODEL
         self.vectorstore_path = VECTORSTORE_DIR
+        self.cross_encoder = CROSS_ENCODER_MODEL
         
     def load_vectorstore(self) -> bool:
         """Load the vectorstore from disk if it exists"""
@@ -71,12 +72,49 @@ class RAGRetriever:
             print(f"Error saving vectorstore: {str(e)}")
             return False
     
+    def _rerank_with_cross_encoder(self, question: str, docs: List[Document], k: int) -> List[Document]:
+        """Rerank documents using cross-encoder model.
+        
+        Args:
+            question: The question to compare documents against.
+            docs: List of documents to rerank.
+            k: Number of top documents to return.
+            
+        Returns:
+            A list of reranked documents, limited to top k.
+        """
+        if not self.cross_encoder or not docs:
+            return docs[:k] if docs else []
+            
+        try:
+            # Prepare document-query pairs for cross-encoder
+            pairs = [(question, doc.page_content) for doc in docs]
+            
+            # Get similarity scores
+            scores = self.cross_encoder.predict(pairs)
+            
+            # Create (score, document) pairs
+            scored_docs = list(zip(scores, docs))
+            
+            # Sort by score in descending order
+            scored_docs.sort(key=lambda x: x[0], reverse=True)
+            
+            # Extract just the documents, now in sorted order
+            reranked_docs = [doc for _, doc in scored_docs]
+            
+            print(f"[Reranker] Reranked {len(docs)} documents, returning top {k}")
+            return reranked_docs[:k]
+        except Exception as e:
+            print(f"Error during cross-encoder reranking: {str(e)}")
+            # Fall back to original order if reranking fails
+            return docs[:k]
+    
     def retrieve_context(self, question: str, k: int = None) -> List[Document]:
         """Retrieve relevant document chunks for a question.
         
         Args:
             question: The question to retrieve context for.
-            k: Number of documents/chunks to retrieve.
+            k: Number of documents/chunks to retrieve after reranking.
             
         Returns:
             A list of relevant Document objects.
@@ -90,19 +128,25 @@ class RAGRetriever:
             k = RETRIEVAL_K
             
         try:
+            # Get more candidates than we need for reranking
+            candidates_k = RETRIEVAL_CANDIDATES if self.cross_encoder else k
+            
             retriever = self.vectorstore.as_retriever(
                 search_type="similarity", 
-                search_kwargs={"k": k}
+                search_kwargs={"k": candidates_k}
             )
             # Retrieve the full Document objects
-            relevant_docs: List[Document] = retriever.get_relevant_documents(question)
+            candidate_docs: List[Document] = retriever.get_relevant_documents(question)
             
-            print(f"[Retriever] Retrieved {len(relevant_docs)} chunks for question.")
-            # Optionally print retrieved sources/metadata for debugging
-            # for i, doc in enumerate(relevant_docs):
-            #     print(f"  - Doc {i}: {doc.metadata}")
+            print(f"[Retriever] Retrieved {len(candidate_docs)} candidate chunks for question.")
             
-            # No source_filter logic needed here anymore
+            # Apply reranking if cross-encoder is available
+            if self.cross_encoder and len(candidate_docs) > k:
+                relevant_docs = self._rerank_with_cross_encoder(question, candidate_docs, k)
+            else:
+                relevant_docs = candidate_docs[:k]
+                
+            print(f"[Retriever] Final document count: {len(relevant_docs)}")
             
             # Return the list of documents directly
             return relevant_docs

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './DocumentsSection.css';
 
-const DocumentsSection = ({ documents, isLoading, error, onRefresh, onDelete }) => {
+const DocumentsSection = ({ className, documents, isLoading, error, onRefresh, onDelete }) => {
   const [deletingIds, setDeletingIds] = useState(new Set());
 
   const handleDelete = async (docId) => {
@@ -70,7 +70,7 @@ const DocumentsSection = ({ documents, isLoading, error, onRefresh, onDelete }) 
   };
 
   return (
-    <div className="section documents-section">
+    <div className={`documents-section ${className || ''}`}>
       <h2>Document Library</h2>
       <button onClick={onRefresh} disabled={isLoading}>Refresh Documents</button>
       <div className="document-list">
