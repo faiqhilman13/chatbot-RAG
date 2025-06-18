@@ -69,8 +69,8 @@ OLLAMA_BASE_URL = "http://localhost:11434"
 # Retrieval settings - Updated for sliding window chunking
 CHUNK_SIZE = 800  # Increased from 500 for better context preservation
 CHUNK_OVERLAP = 300  # Increased from 50 for sliding window effect
-RETRIEVAL_K = 5  # Final number of documents to retrieve after reranking
-RETRIEVAL_CANDIDATES = 20  # Number of initial candidates to retrieve before reranking
+RETRIEVAL_K = 8  # Final number of documents to retrieve after reranking (increased for better coverage)
+RETRIEVAL_CANDIDATES = 30  # Number of initial candidates to retrieve before reranking (increased for better coverage)
 
 # Security Configuration
 SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", token_urlsafe(32))

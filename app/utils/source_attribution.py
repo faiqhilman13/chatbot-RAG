@@ -79,19 +79,17 @@ class SourceAttributionManager:
         return anchored_docs
     
     def _format_chunk_with_anchor(self, content: str, anchor: SourceAnchor) -> str:
-        """Format chunk content with explicit source anchor."""
-        source_info = f"[SOURCE: {anchor.source_file}"
+        """Format chunk content with simple source anchor."""
+        # Just add a simple source reference at the beginning
+        source_info = f"[Source: {anchor.source_file}"
         
         if anchor.page_number:
-            source_info += f" | PAGE: {anchor.page_number}"
+            source_info += f", page {anchor.page_number}"
         
-        if anchor.title and anchor.title != "Unknown":
-            source_info += f" | TITLE: {anchor.title}"
+        source_info += "]"
         
-        source_info += f" | ID: {anchor.chunk_id}]"
-        
-        # Add source anchor at the beginning and end for clarity
-        formatted_content = f"{source_info}\n\n{content}\n\n{source_info}"
+        # Add source anchor only at the beginning
+        formatted_content = f"{source_info}\n{content}"
         
         return formatted_content
     
@@ -320,52 +318,30 @@ class SourceAttributionManager:
         return meaningful_terms[:10]
     
     def generate_source_aware_prompt(self, question: str, anchored_docs: List[Document]) -> str:
-        """Generate a prompt that includes source awareness instructions."""
+        """Generate a clean prompt with minimal source awareness."""
         
-        # Extract source information
-        sources_info = []
+        # Extract just the basic source files for reference
+        source_files = set()
         for doc in anchored_docs:
             anchor = doc.metadata.get("source_anchor")
             if anchor:
-                source_info = f"- {anchor.source_file}"
-                if anchor.page_number:
-                    source_info += f" (Page {anchor.page_number})"
-                if anchor.title and anchor.title != "Unknown":
-                    source_info += f" - {anchor.title}"
-                sources_info.append(source_info)
+                source_files.add(anchor.source_file)
         
-        # Detect cross-document references
-        cross_refs = self.detect_cross_document_references(anchored_docs)
+        # Create clean context without excessive metadata
+        context_parts = []
+        for doc in anchored_docs:
+            context_parts.append(doc.page_content)
         
-        prompt = f"""You are an AI assistant answering questions based on provided context with STRICT source attribution requirements.
+        context = "\n\n".join(context_parts)
+        
+        prompt = f"""Answer the following question based on the provided context. Be accurate and only use information from the context provided.
 
-# CRITICAL SOURCE ATTRIBUTION RULES
+Context:
+{context}
 
-1. **MANDATORY CITATION**: Every factual claim MUST include a source citation in the format [SOURCE: filename | PAGE: X]
-2. **SOURCE VALIDATION**: Only use information that is explicitly present in the provided sources
-3. **NO MIXING**: Do not mix information from different sources unless explicitly comparing them
-4. **CROSS-REFERENCE AWARENESS**: When information spans multiple sources, cite each relevant source
+Question: {question}
 
-# AVAILABLE SOURCES
-{chr(10).join(sources_info)}
-
-# CROSS-DOCUMENT REFERENCES DETECTED
-{self._format_cross_references(cross_refs)}
-
-# CONTEXT WITH SOURCE ANCHORS
-{chr(10).join([doc.page_content for doc in anchored_docs])}
-
-# QUESTION
-{question}
-
-# INSTRUCTIONS FOR ANSWER
-- Begin each factual statement with the relevant source citation
-- If comparing information from multiple sources, cite each source separately
-- If information is contradictory between sources, acknowledge this explicitly
-- If you cannot find relevant information in the sources, state this clearly
-- End your answer with a summary of all sources consulted
-
-# ANSWER"""
+Answer:"""
 
         return prompt
     

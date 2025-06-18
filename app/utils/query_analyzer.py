@@ -43,7 +43,9 @@ class QueryAnalyzer:
             r'\b(who|when|where|which)\b(?!\s+is\b)',  # Exclude "what is" for definitions
             r'\b(name|title|position|role|worked|experience|education|background)\b',
             r'\b(what\s+(position|job|role|title))\b',  # "what position", "what job", etc.
-            r'\b(what\s+did\b)\b'  # "what did"
+            r'\b(what\s+did\b)\b',  # "what did"
+            r'\b(study|studied|university|college|school|degree|graduation|graduated)\b',  # Education-specific
+            r'\b(where\s+(did|does).*\b(study|studied|learn|graduate))\b'  # "where did X study"
         ]
         
         self.summary_patterns = [
@@ -168,21 +170,21 @@ class QueryAnalyzer:
     def _determine_optimal_k(self, query_type: QueryType, complexity: QueryComplexity) -> int:
         """Determine optimal number of documents to retrieve based on query type and complexity."""
         base_k = {
-            QueryType.ENTITY: 3,
-            QueryType.FACTUAL: 3,
-            QueryType.DEFINITION: 2,
+            QueryType.ENTITY: 5,      # Increased from 3 to better cover multi-page documents
+            QueryType.FACTUAL: 4,     # Increased from 3 for better coverage
+            QueryType.DEFINITION: 3,  # Increased from 2 for better context
             QueryType.SUMMARY: 6,
-            QueryType.REASONING: 7  # Reduced from 8 to avoid test failure
+            QueryType.REASONING: 7    # Reduced from 8 to avoid test failure
         }
         
         complexity_multiplier = {
-            QueryComplexity.SIMPLE: 0.8,  # Increased from 0.7 to ensure reasoning queries get >=6
-            QueryComplexity.MEDIUM: 1.0,
+            QueryComplexity.SIMPLE: 1.0,  # Increased from 0.8 to ensure adequate coverage
+            QueryComplexity.MEDIUM: 1.2,  # Increased from 1.0
             QueryComplexity.COMPLEX: 1.5
         }
         
         optimal_k = int(base_k[query_type] * complexity_multiplier[complexity])
-        return max(2, min(optimal_k, 15))  # Ensure between 2-15
+        return max(3, min(optimal_k, 15))  # Ensure between 3-15 (increased minimum)
 
     def _determine_chunk_parameters(self, query_type: QueryType, complexity: QueryComplexity) -> Tuple[int, int]:
         """Determine optimal chunk size and overlap based on query characteristics."""

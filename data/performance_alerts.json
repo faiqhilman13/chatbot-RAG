@@ -18,5 +18,15 @@
     "metric_value": 80.5,
     "threshold": 80.0,
     "resolved": false
+  },
+  {
+    "alert_id": "low_quality_1750248378",
+    "alert_type": "low_quality",
+    "severity": "high",
+    "message": "Answer quality score 2.25 below threshold 2.5",
+    "timestamp": "2025-06-18T20:06:18.212841",
+    "metric_value": 2.25,
+    "threshold": 2.5,
+    "resolved": false
   }
 ]

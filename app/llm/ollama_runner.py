@@ -79,7 +79,8 @@ class OllamaRunner:
             answer = ""
             
             # Use source-aware prompt if source documents are provided and have anchors
-            if source_docs and any(doc.metadata.get("formatted_with_anchor") for doc in source_docs):
+            # TEMPORARILY DISABLED - Source attribution causing garbled output
+            if False and source_docs and any(doc.metadata.get("formatted_with_anchor") for doc in source_docs):
                 print("[LLM] Using source-aware prompt with explicit source attribution")
                 # Generate source-aware prompt using source attribution manager
                 prompt_text = source_attribution_manager.generate_source_aware_prompt(question, source_docs)

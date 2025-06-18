@@ -229,6 +229,12 @@ class RAGRetriever:
             query_words = re.findall(r'\b[a-zA-Z]+\b', question.lower())
             query_keywords = [word for word in query_words if len(word) > 2 and word not in stopwords]
             
+            # For education queries, expand keywords to include education-related terms
+            education_terms = ["study", "studied", "university", "college", "school", "degree", "education"]
+            if any(term in query_keywords for term in ["study", "studied", "xin", "yi"]):
+                query_keywords.extend(["university", "college", "school", "degree", "education", "bachelor", "master"])
+                query_keywords = list(set(query_keywords))  # Remove duplicates
+            
             if not query_keywords:
                 return docs  # If no keywords, return all docs
             
@@ -372,11 +378,19 @@ class RAGRetriever:
         # Simple keyword-based intent detection
         question_lower = question.lower()
         
-        # Person name detection for CV/resume queries (expanded for company queries)
-        person_keywords = ["cv", "resume", "faiq", "hilman", "experience", "education", "skills", "work history", "pricewaterhouse", "pwc", "coopers", "ernst", "young", "ey", "company", "job", "work", "done", "worked"]
+        # Person name detection for CV/resume queries (expanded for company queries and education)
+        person_keywords = ["cv", "resume", "faiq", "hilman", "xin", "yi", "chow", "experience", "education", "skills", "work history", "pricewaterhouse", "pwc", "coopers", "ernst", "young", "ey", "company", "job", "work", "done", "worked", "study", "studied", "university", "college", "school", "degree", "bachelor", "master", "diploma", "graduate", "graduation"]
         if any(keyword in question_lower for keyword in person_keywords):
-            # Look for CV/resume documents
-            filters["title"] = ["cv", "resume", "faiq cv", "faiq hilman", "faiq hilman cv"]
+            # Check if query mentions specific person and prioritize their CV
+            if any(name in question_lower for name in ["xin", "yi", "chow"]):
+                # Query specifically mentions Xin Yi - prioritize her CV only
+                filters["title"] = ["chow cv", "xin yi cv", "xin yi", "chow"]
+            elif any(name in question_lower for name in ["faiq", "hilman"]):
+                # Query specifically mentions Faiq - prioritize his CV only  
+                filters["title"] = ["cv", "resume", "faiq cv", "faiq hilman", "faiq hilman cv"]
+            else:
+                # General CV query - search all CVs
+                filters["title"] = ["cv", "resume", "faiq cv", "faiq hilman", "faiq hilman cv", "chow cv", "xin yi cv", "xin yi", "chow"]
         
         # Financial document detection
         financial_keywords = ["financial", "report", "earnings", "revenue", "profit", "loss", "balance", "income", "cash flow", "tesla", "fy24"]
@@ -510,7 +524,10 @@ class RAGRetriever:
             # Domain-agnostic accuracy improvements pipeline:
             
             # 1. Apply keyword overlap filtering first (removes obviously unrelated chunks)
-            relevant_docs = self._filter_by_keyword_overlap(question, relevant_docs, min_overlap=0.03)
+            # Use more lenient threshold for education/personal queries
+            education_keywords = ["study", "studied", "university", "college", "school", "degree", "education", "graduate"]
+            min_overlap_threshold = 0.01 if any(kw in question.lower() for kw in education_keywords) else 0.03
+            relevant_docs = self._filter_by_keyword_overlap(question, relevant_docs, min_overlap=min_overlap_threshold)
             
             # 2. Apply semantic clustering to group related content 
             if len(relevant_docs) > k:
@@ -521,8 +538,10 @@ class RAGRetriever:
                 
             print(f"[Retriever] Final document count after domain-agnostic filtering: {len(relevant_docs)}")
             
-            # 🧾 ENHANCED SOURCE ATTRIBUTION & CONTEXT MANAGEMENT
-            if use_adaptive_retrieval and relevant_docs:
+            # 🧾 ENHANCED SOURCE ATTRIBUTION & CONTEXT MANAGEMENT (DISABLED FOR CLEAN OUTPUT)
+            # Note: Source attribution temporarily disabled to improve answer readability
+            # TODO: Re-enable with improved formatting after frontend monitoring dashboard is complete
+            if False and use_adaptive_retrieval and relevant_docs:
                 # Create anchored chunks with explicit source metadata
                 relevant_docs = self.source_attribution.create_anchored_chunks(relevant_docs)
                 

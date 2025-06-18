@@ -11,10 +11,19 @@
   {
     "period": "day",
     "time_key": "2025-06-18",
-    "avg_overall_score": 3.179770679770679,
-    "avg_confidence": 0.9179786933079785,
-    "total_queries": 15,
-    "low_quality_count": 0,
+    "avg_overall_score": 3.6523069956905263,
+    "avg_confidence": 0.9396649910161222,
+    "total_queries": 29,
+    "low_quality_count": 1,
     "timestamp": "2025-06-18T19:36:31.205921"
+  },
+  {
+    "period": "hour",
+    "time_key": "2025-06-18-20",
+    "avg_overall_score": 4.158595905604647,
+    "avg_confidence": 0.9629003099891331,
+    "total_queries": 14,
+    "low_quality_count": 1,
+    "timestamp": "2025-06-18T20:02:27.462084"
   }
 ]
