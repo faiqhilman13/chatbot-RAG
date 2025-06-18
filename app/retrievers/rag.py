@@ -21,6 +21,29 @@ class RAGRetriever:
         self.query_analyzer = query_analyzer
         self.source_attribution = source_attribution_manager
         self.hybrid_retriever = None
+        self.document_index = self._load_document_index()
+        
+    def _load_document_index(self):
+        """Load the document index for dynamic person name detection"""
+        try:
+            import json
+            from pathlib import Path
+            
+            # Get the path to document index
+            base_dir = Path(__file__).parent.parent.parent
+            index_path = base_dir / "data" / "document_index.json"
+            
+            if index_path.exists():
+                with open(index_path, 'r') as f:
+                    document_index = json.load(f)
+                print(f"[RAGRetriever] Loaded document index with {len(document_index)} entries")
+                return document_index
+            else:
+                print(f"[RAGRetriever] Document index not found at {index_path}")
+                return {}
+        except Exception as e:
+            print(f"[RAGRetriever] Error loading document index: {e}")
+            return {}
         
     def load_vectorstore(self) -> bool:
         """Load the vectorstore from disk if it exists"""
@@ -65,6 +88,9 @@ class RAGRetriever:
             
             # Initialize hybrid retriever with document corpus
             self._initialize_hybrid_retriever(docs)
+            
+            # Refresh document index for dynamic filtering
+            self.document_index = self._load_document_index()
             
             return True
         except Exception as e:
@@ -378,19 +404,75 @@ class RAGRetriever:
         # Simple keyword-based intent detection
         question_lower = question.lower()
         
-        # Person name detection for CV/resume queries (expanded for company queries and education)
-        person_keywords = ["cv", "resume", "faiq", "hilman", "xin", "yi", "chow", "experience", "education", "skills", "work history", "pricewaterhouse", "pwc", "coopers", "ernst", "young", "ey", "company", "job", "work", "done", "worked", "study", "studied", "university", "college", "school", "degree", "bachelor", "master", "diploma", "graduate", "graduation"]
-        if any(keyword in question_lower for keyword in person_keywords):
-            # Check if query mentions specific person and prioritize their CV
-            if any(name in question_lower for name in ["xin", "yi", "chow"]):
-                # Query specifically mentions Xin Yi - prioritize her CV only
-                filters["title"] = ["chow cv", "xin yi cv", "xin yi", "chow"]
-            elif any(name in question_lower for name in ["faiq", "hilman"]):
-                # Query specifically mentions Faiq - prioritize his CV only  
-                filters["title"] = ["cv", "resume", "faiq cv", "faiq hilman", "faiq hilman cv"]
+        # Dynamic person name detection using multiple strategies
+        import re
+        
+        # Extract potential person names from various patterns
+        common_non_names = {"what", "where", "when", "who", "how", "why", "which", "do", "did", "does", "can", "could", "would", "should", "at", "in", "on", "for", "with", "by", "about", "of", "the", "this", "that", "these", "those", "his", "her", "their", "my", "your", "our", "job", "work", "company", "university", "college", "school", "teaching", "assistant", "manager", "engineer", "analyst", "consultant", "director", "specialist", "coordinator", "officer", "advisor", "developer", "designer", "have", "has", "had", "will", "was", "were", "been", "being", "are", "is"}
+        
+        potential_names = []
+        
+        # Strategy 1: Find capitalized words that could be names
+        capitalized_words = re.findall(r'\b[A-Z][a-z]+\b', question)
+        potential_names.extend([word.lower() for word in capitalized_words if word.lower() not in common_non_names])
+        
+        # Strategy 2: Look for common names that might be lowercase
+        common_names = {"faiq", "hilman", "xin", "yi", "chow", "jack", "kho", "john", "jane", "michael", "sarah", "david", "emma", "alex", "alice", "bob", "charlie", "diana", "edward", "frank", "grace", "henry", "ivan", "kate", "louis", "mary", "nancy", "oscar", "peter", "quinn", "rachel", "steve", "thomas", "ursula", "victoria", "william"}
+        words_in_question = re.findall(r'\b[a-zA-Z]+\b', question.lower())
+        potential_names.extend([word for word in words_in_question if word in common_names])
+        
+        # Remove duplicates and common non-names
+        potential_names = list(set([name for name in potential_names if name not in common_non_names]))
+        
+        print(f"[Intent] Detected potential person names: {potential_names}")
+        
+        # Person-related keywords that indicate CV/resume queries
+        person_keywords = ["cv", "resume", "experience", "education", "skills", "work history", "pricewaterhouse", "pwc", "coopers", "ernst", "young", "ey", "company", "job", "work", "done", "worked", "study", "studied", "university", "college", "school", "degree", "bachelor", "master", "diploma", "graduate", "graduation", "teaching", "assistant", "certification", "certifications", "certified", "certificate", "certificates", "license", "licenses", "licensed", "qualification", "qualifications", "qualified"]
+        
+        # Check if this is a person-related query
+        is_person_query = any(keyword in question_lower for keyword in person_keywords) or potential_names
+        
+        if is_person_query:
+            # Build dynamic filters based on detected names
+            title_filters = []
+            
+            # Check against available documents to find matches
+            if hasattr(self, 'document_index') and self.document_index:
+                # Get all available document titles for matching
+                available_titles = []
+                for doc_id, doc_info in self.document_index.items():
+                    title = doc_info.get('title', '').lower()
+                    available_titles.append(title)
+                
+                print(f"[Intent] Available document titles: {available_titles}")
+                
+                # Match detected names against document titles
+                for name in potential_names:
+                    for title in available_titles:
+                        # Check if the name appears in the document title
+                        if name in title:
+                            title_filters.append(title)
+                            # Also add variations
+                            if "cv" not in title and ("cv" in question_lower or "resume" in question_lower):
+                                title_filters.append(f"{name} cv")
+                
+                # Fallback: if we detected names but no title matches, search all CV-like documents
+                if potential_names and not title_filters:
+                    cv_titles = [title for title in available_titles if any(cv_word in title for cv_word in ["cv", "resume"])]
+                    title_filters.extend(cv_titles)
+                    print(f"[Intent] No specific name matches, using all CV documents: {cv_titles}")
+                
+                # If still no matches, use general CV/resume filter for person queries
+                if is_person_query and not title_filters:
+                    title_filters = ["cv", "resume"]
+                    print(f"[Intent] Fallback to general CV/resume filter")
             else:
-                # General CV query - search all CVs
-                filters["title"] = ["cv", "resume", "faiq cv", "faiq hilman", "faiq hilman cv", "chow cv", "xin yi cv", "xin yi", "chow"]
+                # Fallback when document index not available
+                title_filters = ["cv", "resume"]
+                print(f"[Intent] Document index not available, using general CV/resume filter")
+            
+            if title_filters:
+                filters["title"] = list(set(title_filters))  # Remove duplicates
         
         # Financial document detection
         financial_keywords = ["financial", "report", "earnings", "revenue", "profit", "loss", "balance", "income", "cash flow", "tesla", "fy24"]
@@ -524,10 +606,17 @@ class RAGRetriever:
             # Domain-agnostic accuracy improvements pipeline:
             
             # 1. Apply keyword overlap filtering first (removes obviously unrelated chunks)
-            # Use more lenient threshold for education/personal queries
-            education_keywords = ["study", "studied", "university", "college", "school", "degree", "education", "graduate"]
-            min_overlap_threshold = 0.01 if any(kw in question.lower() for kw in education_keywords) else 0.03
-            relevant_docs = self._filter_by_keyword_overlap(question, relevant_docs, min_overlap=min_overlap_threshold)
+            # Skip keyword filtering entirely for certification/skill queries to ensure better page coverage
+            cert_skill_keywords = ["certification", "certifications", "certified", "certificate", "certificates", "license", "licenses", "licensed", "qualification", "qualifications", "qualified", "skills"]
+            should_skip_keyword_filter = any(kw in question.lower() for kw in cert_skill_keywords)
+            
+            if not should_skip_keyword_filter:
+                # Use more lenient threshold for education/personal queries
+                lenient_keywords = ["study", "studied", "university", "college", "school", "degree", "education", "graduate", "experience"]
+                min_overlap_threshold = 0.005 if any(kw in question.lower() for kw in lenient_keywords) else 0.03
+                relevant_docs = self._filter_by_keyword_overlap(question, relevant_docs, min_overlap=min_overlap_threshold)
+            else:
+                print(f"[Keyword Filter] Skipping keyword overlap filtering for certification/skills query to ensure better coverage")
             
             # 2. Apply semantic clustering to group related content 
             if len(relevant_docs) > k:
