@@ -14,4 +14,5 @@ passlib[bcrypt]
 python-jose[cryptography]
 itsdangerous
 pytest
-pytest-asyncio 
+pytest-asyncio
+scikit-learn 

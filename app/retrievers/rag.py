@@ -4,6 +4,9 @@ import os
 import pickle
 from typing import List, Tuple, Optional, Dict, Any, Union
 from langchain.schema import Document
+from sklearn.cluster import DBSCAN
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 class RAGRetriever:
     def __init__(self):
@@ -109,6 +112,183 @@ class RAGRetriever:
             # Fall back to original order if reranking fails
             return docs[:k]
     
+    def _cluster_documents_post_rerank(self, docs: List[Document], k: int) -> List[Document]:
+        """Cluster documents after reranking to prevent context mixing using semantic similarity.
+        
+        Args:
+            docs: List of reranked documents.
+            k: Number of documents to return.
+            
+        Returns:
+            Documents from the most semantically cohesive cluster.
+        """
+        if len(docs) <= k:
+            return docs
+            
+        try:
+            # Get embeddings for all document contents using the same embedding model
+            doc_texts = [doc.page_content for doc in docs]
+            
+            # Create embeddings using the same model used for vector store
+            if not self.embedding_model:
+                print("[Clustering] No embedding model available, falling back to original order")
+                return docs[:k]
+            
+            # Get embeddings for semantic clustering
+            embeddings = self.embedding_model.embed_documents(doc_texts)
+            embeddings = np.array(embeddings)
+            
+            # Calculate cosine similarity matrix
+            similarity_matrix = cosine_similarity(embeddings)
+            
+            # Convert similarity to distance for clustering (1 - similarity)
+            distance_matrix = 1 - similarity_matrix
+            
+            # Use DBSCAN clustering on semantic similarity
+            clustering = DBSCAN(eps=0.3, min_samples=2, metric='precomputed')
+            cluster_labels = clustering.fit_predict(distance_matrix)
+            
+            # Find the largest cluster (most coherent group)
+            unique_labels, counts = np.unique(cluster_labels[cluster_labels >= 0], return_counts=True)
+            
+            if len(unique_labels) > 0:
+                largest_cluster_label = unique_labels[np.argmax(counts)]
+                clustered_docs = [doc for i, doc in enumerate(docs) if cluster_labels[i] == largest_cluster_label]
+                
+                print(f"[Semantic Clustering] Found {len(unique_labels)} clusters, selecting largest with {len(clustered_docs)} documents")
+                
+                # Return documents from the largest cluster, up to k
+                return clustered_docs[:k]
+            else:
+                print(f"[Semantic Clustering] No coherent clusters found, returning top {k} documents")
+                return docs[:k]
+                
+        except Exception as e:
+            print(f"[Semantic Clustering] Error during clustering: {str(e)}, falling back to original order")
+            return docs[:k]
+    
+    def _filter_by_keyword_overlap(self, question: str, docs: List[Document], min_overlap: float = 0.1) -> List[Document]:
+        """Filter documents by keyword overlap with the query (domain-agnostic).
+        
+        Args:
+            question: The user's question.
+            docs: List of documents to filter.
+            min_overlap: Minimum keyword overlap ratio to keep a document.
+            
+        Returns:
+            Documents with sufficient keyword overlap.
+        """
+        try:
+            import re
+            from collections import Counter
+            
+            # Normalize and tokenize query (remove stopwords, punctuation)
+            stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'her', 'its', 'our', 'their'}
+            
+            # Company name aliases for better matching
+            company_aliases = {
+                'pricewaterhouse': ['pwc', 'pricewaterhousecoopers', 'price waterhouse coopers'],
+                'pwc': ['pricewaterhouse', 'pricewaterhousecoopers', 'price waterhouse coopers'],
+                'pricewaterhousecoopers': ['pwc', 'pricewaterhouse', 'price waterhouse coopers'],
+                'coopers': ['pwc', 'pricewaterhouse', 'pricewaterhousecoopers'],
+                'ernst': ['ey', 'ernst young', 'ernstyoung'],
+                'young': ['ey', 'ernst young', 'ernstyoung'],
+                'ey': ['ernst', 'young', 'ernst young', 'ernstyoung']
+            }
+            
+            # Extract meaningful keywords from query
+            query_words = re.findall(r'\b[a-zA-Z]+\b', question.lower())
+            query_keywords = [word for word in query_words if len(word) > 2 and word not in stopwords]
+            
+            if not query_keywords:
+                return docs  # If no keywords, return all docs
+            
+            filtered_docs = []
+            for doc in docs:
+                # Extract words from document content
+                doc_words = re.findall(r'\b[a-zA-Z]+\b', doc.page_content.lower())
+                doc_word_set = set(doc_words)
+                
+                # Calculate keyword overlap with alias expansion
+                matching_keywords = []
+                for kw in query_keywords:
+                    # Direct match
+                    if kw in doc_word_set:
+                        matching_keywords.append(kw)
+                    # Alias match
+                    elif kw in company_aliases:
+                        for alias in company_aliases[kw]:
+                            # Check if alias exists in document (with spaces)
+                            if alias in doc.page_content.lower() or any(a in doc_word_set for a in alias.split()):
+                                matching_keywords.append(kw)
+                                break
+                
+                # More lenient overlap calculation
+                overlap_ratio = len(set(matching_keywords)) / len(query_keywords)
+                
+                if overlap_ratio >= min_overlap:
+                    filtered_docs.append(doc)
+                    
+            print(f"[Keyword Filter] Filtered {len(docs)} to {len(filtered_docs)} docs with >{min_overlap:.0%} keyword overlap")
+            
+            # If too few docs pass filter, return original docs
+            return filtered_docs if filtered_docs else docs
+            
+        except Exception as e:
+            print(f"[Keyword Filter] Error during filtering: {str(e)}, returning original docs")
+            return docs
+    
+    def _score_context_coherence(self, docs: List[Document], k: int) -> List[Document]:
+        """Score and rerank documents based on inter-document semantic coherence.
+        
+        Args:
+            docs: List of documents to score.
+            k: Number of documents to return.
+            
+        Returns:
+            Documents reranked by coherence score.
+        """
+        if len(docs) <= k:
+            return docs
+            
+        try:
+            if not self.embedding_model:
+                return docs[:k]
+            
+            # Get embeddings for all documents
+            doc_texts = [doc.page_content for doc in docs]
+            embeddings = self.embedding_model.embed_documents(doc_texts)
+            embeddings = np.array(embeddings)
+            
+            # Calculate coherence scores for each document
+            coherence_scores = []
+            for i, doc in enumerate(docs):
+                # Calculate average similarity with all other documents
+                similarities = []
+                for j, other_doc in enumerate(docs):
+                    if i != j:
+                        sim = cosine_similarity([embeddings[i]], [embeddings[j]])[0][0]
+                        similarities.append(sim)
+                
+                # Coherence score is the average similarity with other documents
+                coherence_score = np.mean(similarities) if similarities else 0.0
+                coherence_scores.append((coherence_score, doc))
+            
+            # Sort by coherence score (descending)
+            coherence_scores.sort(key=lambda x: x[0], reverse=True)
+            
+            # Return top k most coherent documents
+            coherent_docs = [doc for _, doc in coherence_scores[:k]]
+            
+            avg_coherence = np.mean([score for score, _ in coherence_scores[:k]])
+            print(f"[Coherence] Reranked by coherence, avg score: {avg_coherence:.3f}")
+            
+            return coherent_docs
+            
+        except Exception as e:
+            print(f"[Coherence] Error during coherence scoring: {str(e)}, returning original order")
+            return docs[:k]
+    
     def _filter_documents_by_metadata(self, docs: List[Document], 
                                      filter_criteria: Dict[str, Any]) -> List[Document]:
         """Filter documents based on metadata criteria.
@@ -163,8 +343,8 @@ class RAGRetriever:
         # Simple keyword-based intent detection
         question_lower = question.lower()
         
-        # Person name detection for CV/resume queries
-        person_keywords = ["cv", "resume", "faiq", "hilman", "experience", "education", "skills", "work history"]
+        # Person name detection for CV/resume queries (expanded for company queries)
+        person_keywords = ["cv", "resume", "faiq", "hilman", "experience", "education", "skills", "work history", "pricewaterhouse", "pwc", "coopers", "ernst", "young", "ey", "company", "job", "work", "done", "worked"]
         if any(keyword in question_lower for keyword in person_keywords):
             # Look for CV/resume documents
             filters["title"] = ["cv", "resume", "faiq cv", "faiq hilman", "faiq hilman cv"]
@@ -239,11 +419,23 @@ class RAGRetriever:
             
             # Apply reranking if cross-encoder is available
             if self.cross_encoder and len(candidate_docs) > k:
-                relevant_docs = self._rerank_with_cross_encoder(question, candidate_docs, k)
+                relevant_docs = self._rerank_with_cross_encoder(question, candidate_docs, min(k * 2, len(candidate_docs)))
             else:
-                relevant_docs = candidate_docs[:k]
+                relevant_docs = candidate_docs[:min(k * 2, len(candidate_docs))]
+            
+            # Domain-agnostic accuracy improvements pipeline:
+            
+            # 1. Apply keyword overlap filtering first (removes obviously unrelated chunks)
+            relevant_docs = self._filter_by_keyword_overlap(question, relevant_docs, min_overlap=0.03)
+            
+            # 2. Apply semantic clustering to group related content 
+            if len(relevant_docs) > k:
+                relevant_docs = self._cluster_documents_post_rerank(relevant_docs, k * 2)  # Get larger cluster
+            
+            # 3. Apply coherence scoring for final ranking
+            relevant_docs = self._score_context_coherence(relevant_docs, k)
                 
-            print(f"[Retriever] Final document count: {len(relevant_docs)}")
+            print(f"[Retriever] Final document count after domain-agnostic filtering: {len(relevant_docs)}")
             
             # Return the list of documents directly
             return relevant_docs

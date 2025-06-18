@@ -24,7 +24,13 @@ import traceback # Add import for traceback module
 app = FastAPI(title="Hybrid RAG Chatbot")
 
 # Add session middleware (must be added before other middleware that uses sessions)
-app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)
+app.add_middleware(
+    SessionMiddleware, 
+    secret_key=SESSION_SECRET_KEY,
+    max_age=3600,  # 1 hour session timeout
+    same_site="lax",  # Allow cross-site requests for development
+    https_only=False  # Allow HTTP for development (set to True in production)
+)
 
 # Add CORS middleware
 app.add_middleware(
@@ -35,9 +41,9 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],  # Restrict headers
 )
 
-# Include API routers
-app.include_router(auth.router)
-app.include_router(ask.router)
+# Include API routers with /api prefix
+app.include_router(auth.router, prefix="/api")
+app.include_router(ask.router, prefix="/api")
 
 # Security headers middleware
 @app.middleware("http")
@@ -107,7 +113,7 @@ def save_document_index(index_data):
 
 # --- Document Management Endpoints ---
 
-@app.post("/upload", tags=["Documents"])
+@app.post("/api/upload", tags=["Documents"])
 async def upload_document(
     file: UploadFile = File(...), 
     title: str = Form(None),
@@ -237,7 +243,7 @@ async def upload_document(
     finally:
         await file.close()
 
-@app.get("/documents", tags=["Documents"])
+@app.get("/api/documents", tags=["Documents"])
 async def list_documents(current_user: str = Depends(require_auth)):
     # --- Read from JSON Index --- 
     print("Loading documents from JSON index...")
@@ -248,7 +254,7 @@ async def list_documents(current_user: str = Depends(require_auth)):
     return JSONResponse({"documents": documents_list})
     # --- End Read from JSON Index ---
 
-@app.delete("/documents/{doc_id}", tags=["Documents"])
+@app.delete("/api/documents/{doc_id}", tags=["Documents"])
 async def delete_document(doc_id: str, current_user: str = Depends(require_auth)):
     print(f"--- Starting Deletion Process for doc_id: {doc_id} ---")
     index_entry_found = False

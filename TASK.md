@@ -2,6 +2,39 @@
 
 ## Current Tasks (2024-07)
 
+### **🔥 HIGH PRIORITY: Improve RAG Answer Accuracy**
+*Goal: Fix incorrect information mixing between different work experiences and improve contextual accuracy.*
+
+**Issue Identified:** The system correctly retrieves relevant documents but LLM mixing information from different sections/experiences within the same document. Example: PwC question answered correctly about job title/dates but incorrectly included revenue generation details from a different role.
+
+**🧠 Generalized Strategies for Accuracy** 
+Since the RAG system is domain-agnostic and handles various document types (CVs, financial reports, stories, etc.), implementing generalized accuracy improvements without hardcoding for specific formats:
+
+**Approach Comparison:**
+| Approach | Works for | Complexity | Benefit |
+|----------|-----------|------------|---------|
+| Sliding windows | All domains | Low | High |
+| Post-rerank clustering | All | Medium | High |
+| Instruction prompting | All | Low | Medium |
+| Entity filtering | Structured/Named text | Medium | Medium |
+| Hybrid keyword+vector | Reports, structured docs | Medium | Medium |
+
+- [x] **Subtask:** **Implement Sliding Window Chunking** - Replace static 500-token chunks with sliding windows (e.g., chunk_size=800, chunk_overlap=300) to preserve context across boundaries and reduce information loss ✅ **COMPLETED** - Implemented but needs refinement
+- [x] **Subtask:** **Implement Post-Rerank Clustering** - After cross-encoder reranking, cluster top results based on metadata similarity (source, page) or cosine similarity, then select the most cohesive cluster to prevent mixing disparate contexts ✅ **COMPLETED** - Implemented but still mixing contexts, needs algorithm refinement
+- [ ] **Subtask:** **PRIORITY: Implement Content-Based Semantic Clustering** - Replace metadata clustering with semantic similarity clustering using embedding cosine similarity to group topically related chunks (works for any document type: CVs, reports, stories, etc.)
+- [ ] **Subtask:** **PRIORITY: Add Keyword Overlap Filtering** - Boost chunks with high lexical overlap with query terms, preventing retrieval of unrelated sections regardless of document type
+- [ ] **Subtask:** **Implement Query-Context Coherence Scoring** - Score retrieved chunks based on semantic coherence with each other, not just query similarity, to prevent mixing unrelated topics
+- [ ] **Subtask:** **Add Chunk Boundary Awareness** - Detect when chunks span different topics/sections and split them more intelligently (works for any structured document)
+- [ ] **Subtask:** **Add Company-Specific Context Filtering** - Extract company names from queries (e.g., "PwC", "PricewaterhouseCoopers") and filter chunks to only include content mentioning that specific company
+- [ ] **Subtask:** **Add Dynamic In-Context Instruction Prompting** - Append context-specific instructions to LLM prompts based on query type (e.g., "If multiple contexts are provided, prefer those referring to the same topic or entity. Avoid mixing unrelated sources.")
+- [ ] **Subtask:** **Implement Entity Filtering Pre-Reranking** - Use spaCy to extract entities from query and down-rank chunks that don't contain key entities to improve relevance
+- [ ] **Subtask:** **Add Hybrid FAISS + Keyword Filtering** - Combine vector similarity with keyword overlap filtering to boost chunks with high lexical similarity to the query
+- [ ] **Subtask:** **Implement Semantic Chunk Grouping** - Move beyond fixed-size chunking to semantic segmentation that respects document structure and content boundaries
+- [ ] **Subtask:** **Add Cluster Cohesion Scoring** - Measure internal similarity within retrieved chunk clusters and prefer more cohesive result sets
+- [ ] **Subtask:** **Enhance Cross-Encoder with Context Awareness** - Modify reranking to consider not just query-chunk similarity but also chunk-to-chunk coherence within the result set
+- [ ] **Subtask:** **Implement Multi-Chunk Context Windows** - For complex queries, retrieve larger context windows that span multiple related chunks while maintaining semantic boundaries
+- [ ] **Subtask:** **Add Answer Validation Pipeline** - Implement post-generation validation to check if facts in the answer are supported by the same logical document sections
+
 ### Task: Enhance Source Filtering System
 *Goal: Make the filtering system more robust and user-friendly.*
 

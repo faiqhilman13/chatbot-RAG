@@ -19,7 +19,7 @@ const DocumentsPage = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://127.0.0.1:8001/documents', {
+      const response = await fetch('/api/documents', {
         credentials: 'include'
       });
       if (!response.ok) {

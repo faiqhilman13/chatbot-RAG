@@ -102,7 +102,7 @@ const ChatSection = ({ className }) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://127.0.0.1:8001/ask', {
+      const response = await fetch('/api/ask', {
         method: 'POST',
         credentials: 'include',
         headers: {

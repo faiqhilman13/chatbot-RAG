@@ -4,6 +4,10 @@ import os
 from pathlib import Path
 from typing import Optional
 from secrets import token_urlsafe
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Base directory using pathlib
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -62,9 +66,9 @@ LLM_MODEL_NAME = "llama3:8b"  # Using llama3:8b model
 # Ollama API URL
 OLLAMA_BASE_URL = "http://localhost:11434"
 
-# Retrieval settings
-CHUNK_SIZE = 500
-CHUNK_OVERLAP = 50
+# Retrieval settings - Updated for sliding window chunking
+CHUNK_SIZE = 800  # Increased from 500 for better context preservation
+CHUNK_OVERLAP = 300  # Increased from 50 for sliding window effect
 RETRIEVAL_K = 5  # Final number of documents to retrieve after reranking
 RETRIEVAL_CANDIDATES = 20  # Number of initial candidates to retrieve before reranking
 

@@ -1,8 +1,6 @@
 import React from 'react';
 import './App.css';
 import Sidebar from './components/Sidebar';
-import { StagewiseToolbar } from '@stagewise/toolbar-react';
-import { ReactPlugin } from '@stagewise-plugins/react';
 import { PageProvider, usePage, PAGES } from './context/PageContext';
 import { ChatProvider } from './context/ChatContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -75,7 +73,6 @@ const AppContent = () => {
 function App() {
   return (
     <AuthProvider>
-      <StagewiseToolbar config={{ plugins: [ReactPlugin] }} />
       <AppContent />
     </AuthProvider>
   );
