@@ -1,25 +1,8 @@
-# Chatbot RAG Architecture Diagrams
+# Architecture Diagrams
 
-This document provides diagrams illustrating the key workflows of the Hybrid RAG Chatbot application.
-
-## Recent Improvements (July 2024)
-
-The RAG system has been enhanced with several improvements to increase accuracy and performance:
-
-1. **Advanced Embedding Model**: Replaced the original `all-MiniLM-L6-v2` embedding model with `BAAI/bge-large-en-v1.5`, which provides more accurate semantic representations of text.
-
-2. **Cross-Encoder Reranking**: Added a two-stage retrieval process:
-   - First stage: Retrieve a larger set of candidate chunks (20 by default) using vector similarity
-   - Second stage: Rerank these candidates using the `cross-encoder/ms-marco-MiniLM-L-6-v2` model
-   - Return only the top k (5 by default) most relevant chunks after reranking
-
-3. **Updated LLM Model**: Now using `llama3:8b` from Ollama for generating responses, replacing the previous `mistral` model.
-
-These improvements significantly enhance the quality of retrieved context and the accuracy of generated answers.
+This file contains the mermaid diagrams for the Hybrid RAG Chatbot application workflows.
 
 ## Document Upload Flow
-
-This diagram shows the sequence of events when a user uploads a PDF document.
 
 ```mermaid
 sequenceDiagram
@@ -63,8 +46,6 @@ sequenceDiagram
 
 ## Question Answering Flow
 
-This diagram shows the enhanced sequence for answering a user's question with cross-encoder reranking.
-
 ```mermaid
 sequenceDiagram
     participant U as User
@@ -103,8 +84,6 @@ sequenceDiagram
 ```
 
 ## Document Deletion Flow
-
-This diagram illustrates the "nuke and rebuild" process when a document is deleted.
 
 ```mermaid
 sequenceDiagram
@@ -151,26 +130,4 @@ sequenceDiagram
     R-->>B: Cache cleared
     B-->>F: Success Response
     F-->>U: Update document list / Show confirmation
-```
-
-## System Architecture Overview
-
-The enhanced RAG system now follows this process:
-
-1. **Document Processing**:
-   - PDF documents are processed page by page and split into chunks
-   - Each chunk maintains metadata including source file, page number, and document ID
-   - Chunks are embedded using the BAAI/bge-large-en-v1.5 model for higher quality representations
-
-2. **Two-Stage Retrieval**:
-   - When a question is asked, it's embedded using the same BAAI/bge-large-en-v1.5 model
-   - First stage: Retrieve 20 candidate chunks using vector similarity search in FAISS
-   - Second stage: Rerank these candidates using the cross-encoder/ms-marco-MiniLM-L-6-v2 model
-   - Return only the top 5 most relevant chunks after reranking
-
-3. **Answer Generation**:
-   - The selected chunks are combined to form the context
-   - The llama3:8b model from Ollama generates an answer based on the question and context
-   - The answer is returned to the user along with source information
-
-This two-stage retrieval process significantly improves the quality of retrieved context and the accuracy of generated answers compared to simple vector similarity search alone. 
+``` 
