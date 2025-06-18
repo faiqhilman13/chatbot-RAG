@@ -80,13 +80,28 @@ The RAG system has undergone significant enhancements to dramatically improve ac
     - **System Health Monitoring**: Automated health checks and alerting
     - **Quality Trends**: Tracking answer quality over time with trend analysis
 
-14. **Adaptive Retrieval Intelligence**: Smart query analysis and optimization:
+14. **AI-Powered Feedback Loop System**: Intelligent self-improving RAG with user-driven optimization:
+    - **User Rating Interface**: Intuitive thumbs up/down buttons with optional comment system
+    - **Automatic Parameter Optimization**: Dynamic adjustment of K values (3-15) and reranker thresholds (0.1-0.9)
+    - **Pattern Analysis Engine**: Groups feedback by parameter combinations to identify optimization opportunities
+    - **Smart Cooldown Mechanisms**: Intelligent waiting periods (2 hours) and minimum feedback thresholds (5 entries)
+    - **Performance Scoring**: Combined scoring using 40% user ratings + 60% LLM quality scores
+    - **Real-time Analytics**: Comprehensive feedback dashboard with positive/negative ratios and adjustment history
+
+15. **Enhanced Monitoring Dashboard**: Professional-grade monitoring interface with real-time visualizations:
+    - **System Health Cards**: Visual status indicators (excellent/good/fair/poor) with color-coded metrics
+    - **Performance Charts**: Dual-axis charts for response time and success rate trends over time
+    - **Quality Analytics**: Answer quality trends with faithfulness, relevance, and completeness scoring
+    - **Query Pattern Analysis**: Popular queries, classification breakdowns, and error pattern detection
+    - **Export Functionality**: CSV/JSON data export for external analysis and reporting
+
+16. **Adaptive Retrieval Intelligence**: Smart query analysis and optimization:
     - **Query Pattern Recognition**: Detects semantic vs keyword-heavy queries
     - **Dynamic Parameter Adjustment**: Adapts retrieval parameters based on query type
     - **Context Quality Assessment**: Evaluates retrieved context relevance before answer generation
     - **Performance Alerts**: Real-time notifications for quality degradation
 
-15. **Source Attribution & Citation Validation**: Enhanced answer transparency:
+17. **Source Attribution & Citation Validation**: Enhanced answer transparency:
     - **Automatic Citation Generation**: Adds source references to answers
     - **Citation Accuracy Validation**: Verifies citations match source content
     - **Source-Aware Prompting**: Uses document anchors for precise attribution
@@ -98,21 +113,25 @@ The RAG system has undergone significant enhancements to dramatically improve ac
 - **Quality Monitoring**: Automated quality scores averaging 3.5+/5.0 with 90%+ confidence
 - **Response Time**: Optimized hybrid retrieval completes in <100ms
 - **System Reliability**: 95%+ success rate with automated health monitoring
+- **Self-Improvement**: AI-powered feedback loop with automatic parameter optimization based on user ratings
+- **Real-time Insights**: Comprehensive monitoring dashboard with live performance charts and system health visualization
+- **User Engagement**: Seamless feedback collection with 👍/👎 interface and optional detailed comments
+- **Parameter Intelligence**: Dynamic K-value and threshold adjustments (2-hour cooldowns, 5-feedback minimums)
 
 ### Enhanced Page Coverage & Dynamic Person Detection (January 2025)
-16. **Dynamic Person Name Detection**: Implemented intelligent person name detection using multiple strategies:
+18. **Dynamic Person Name Detection**: Implemented intelligent person name detection using multiple strategies:
     - **Capitalized Word Detection**: Identifies proper names in queries (e.g., "Jack Kho", "Xin Yi")
     - **Case-Insensitive Common Names**: Recognizes lowercase names (e.g., "faiq", "chow") from predefined common names list
     - **Dynamic Document Matching**: Automatically maps detected names to available documents
     - **Fallback Mechanisms**: Uses general CV/resume filtering when specific name matches aren't found
 
-17. **Improved Page Coverage for Certification & Skills Queries**: Enhanced retrieval to ensure comprehensive coverage:
+19. **Improved Page Coverage for Certification & Skills Queries**: Enhanced retrieval to ensure comprehensive coverage:
     - **Selective Keyword Filtering**: Bypasses aggressive keyword overlap filtering for certification/skills queries
     - **Page-Aware Retrieval**: Ensures equal representation from all document pages (previously biased toward page 1)
     - **Enhanced Coverage**: Improved from 1 document (page 1 only) to 10+ documents (balanced across all pages)
     - **Smart Query Classification**: Automatically detects certification, skills, and qualification queries
 
-18. **Advanced Query Intent Detection**: Sophisticated query analysis and filtering:
+20. **Advanced Query Intent Detection**: Sophisticated query analysis and filtering:
     - **Person-Specific Filtering**: Automatically filters to relevant person's documents based on name detection
     - **Content Type Recognition**: Distinguishes between CV/resume, financial, and technical document queries
     - **Dynamic Title Matching**: Matches person names against document titles with fuzzy matching
@@ -428,10 +447,11 @@ sequenceDiagram
     Admin->>API: POST /api/eval/grounding (answer, query)
     API->>HR: retrieve_context(query)
     HR-->>API: Context documents
-    API->>SM: Compare answer with context content
-    SM->>SM: Calculate sequence similarity ratio
-    SM-->>API: Grounding score (0-1)
-    API-->>Admin: Grounding metrics
+    API->>SM: check_grounding(answer, context)
+    SM->>SM: Use SequenceMatcher to find context phrases in answer
+    SM->>SM: Calculate grounding ratio (0-1 scale)
+    SM-->>API: Grounding score and matched phrases
+    API-->>Admin: Grounding evaluation results
 
     Note over Admin: Comprehensive Pipeline Evaluation
     Admin->>API: POST /api/eval/pipeline (test_cases)
@@ -449,6 +469,98 @@ sequenceDiagram
     end
     API->>API: Calculate aggregate performance
     API-->>Admin: Comprehensive evaluation report with quality trends
+```
+
+### AI-Powered Feedback Loop System Flow
+
+**%% Title: AI-Powered Feedback Loop System Flow**  
+This diagram shows the intelligent feedback collection, analysis, and automatic parameter optimization system.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as Frontend
+    participant API as FeedbackAPI
+    participant FS as FeedbackSystem
+    participant PA as ParameterAdjustment
+    participant AE as AnswerEvaluator
+    participant RAG as RAGRetriever
+    participant DB as FeedbackStorage
+
+    Note over U: User Interaction with Feedback
+    U->>F: Asks question, receives answer
+    F->>F: Display feedback buttons (👍/👎)
+    U->>F: Clicks 👍 or 👎 feedback button
+    alt Negative Feedback
+        F->>F: Show optional comment input
+        U->>F: Optionally provides comment
+    end
+    F->>API: POST /api/feedback/submit (rating, metadata, comment)
+    
+    Note over API: Feedback Collection and Analysis
+    API->>FS: collect_feedback(feedback_entry)
+    FS->>FS: Create FeedbackEntry with contextual data
+    FS->>FS: Store rating, quality_score, confidence, retrieval_method
+    FS->>FS: Record K_value, reranker_threshold, response_time
+    FS->>DB: Save feedback entry with timestamp
+    DB-->>FS: Storage confirmation
+    
+    Note over FS: Pattern Analysis and Performance Scoring
+    FS->>FS: Group feedback by parameter combinations
+    FS->>FS: Calculate performance scores (40% user + 60% LLM)
+    FS->>FS: Identify negative patterns (score < 0.4)
+    FS->>FS: Check minimum feedback threshold (≥5 entries)
+    FS->>FS: Verify cooldown period (≥2 hours since last adjustment)
+    
+    alt Adjustment Criteria Met
+        Note over FS: Automatic Parameter Optimization
+        FS->>PA: analyze_feedback_patterns(grouped_feedback)
+        PA->>PA: Calculate average performance scores by parameter set
+        PA->>PA: Identify underperforming configurations
+        
+        alt Poor Recall (low user satisfaction)
+            PA->>PA: Increase K value (current → min(current + 2, 15))
+            PA->>PA: Decrease reranker threshold (current → max(current - 0.1, 0.1))
+        else Poor Precision (too much irrelevant content)
+            PA->>PA: Decrease K value (current → max(current - 1, 3))
+            PA->>PA: Increase reranker threshold (current → min(current + 0.1, 0.9))
+        end
+        
+        PA->>PA: Create ParameterAdjustment record
+        PA->>PA: Set cooldown timestamp
+        PA->>DB: Store parameter adjustment history
+        DB-->>PA: Storage confirmation
+        PA-->>FS: New optimal parameters calculated
+    else Adjustment Criteria Not Met
+        FS->>FS: Log feedback but maintain current parameters
+    end
+    
+    Note over FS: Response to User
+    FS-->>API: Feedback processed successfully
+    API-->>F: Success confirmation
+    F->>F: Show visual feedback confirmation (checkmark animation)
+    F-->>U: "Thank you for your feedback!" message
+    
+    Note over RAG: Parameter Application in Future Queries
+    U->>F: Asks new question
+    F->>RAG: Process query with current optimal parameters
+    RAG->>FS: get_optimal_parameters()
+    FS->>FS: Load latest optimal K and threshold values
+    FS-->>RAG: Current optimal parameters
+    RAG->>RAG: Apply optimal K and reranker_threshold
+    RAG->>RAG: Execute retrieval with optimized parameters
+    RAG-->>F: Enhanced response using learned parameters
+    F-->>U: Improved answer quality based on past feedback
+    
+    Note over API: Analytics and Insights
+    API->>FS: get_feedback_summary(hours=24)
+    FS->>DB: Load recent feedback entries
+    DB-->>FS: Feedback data with trends
+    FS->>FS: Calculate positive/negative ratios
+    FS->>FS: Analyze parameter adjustment history
+    FS->>FS: Generate optimization insights
+    FS-->>API: Comprehensive feedback analytics
+    API-->>F: Real-time feedback dashboard data
 ```
 
 ## System Architecture Overview
