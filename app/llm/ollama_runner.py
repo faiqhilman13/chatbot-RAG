@@ -55,16 +55,29 @@ class OllamaRunner:
         try:
             template = """
             You are an AI assistant answering questions based on the provided context.
-            Answer the question using only the provided context.
-            If the answer cannot be found in the context, respond with "I don't have enough information to answer that question."
             
-            Context:
+            # INSTRUCTIONS
+            1. Answer the question using ONLY the provided context.
+            2. If the answer cannot be found in the context, respond with "I don't have enough information to answer that question."
+            3. IMPORTANT: Evaluate the relevance of each source before using it. Discard any sources that are not directly relevant to the question.
+            4. Focus on quality over quantity - use only the most relevant sources.
+            5. If sources contradict each other, explain the discrepancy.
+            6. If the context contains irrelevant documents (like financial statements when asked about a person's experience), IGNORE those completely.
+            
+            # SOURCE VALIDATION
+            Before answering, analyze each source for relevance to the question:
+            - For questions about people (experience, education, skills), only use CV/resume documents
+            - For questions about companies or financial information, only use relevant reports
+            - For technical questions, only use technical documentation
+            - Discard any source that doesn't directly relate to the question topic
+            
+            # CONTEXT
             {context}
             
-            Question:
+            # QUESTION
             {question}
             
-            Answer:
+            # ANSWER
             """
             
             prompt = ChatPromptTemplate.from_template(template)

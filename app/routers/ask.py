@@ -12,6 +12,7 @@ router = APIRouter(tags=["qa"])
 
 class QuestionRequest(BaseModel):
     question: str
+    doc_filter: Optional[Dict[str, Any]] = None
 
 class SourceDocument(BaseModel):
     source: Optional[str] = None
@@ -24,9 +25,12 @@ class QuestionResponse(BaseModel):
     sources: List[SourceDocument]
 
 @router.post("/ask", response_model=QuestionResponse)
-async def ask_question(request: QuestionRequest):
+async def ask_question(request: Request):
     """Ask a question and get an answer using RAG"""
-    question = request.question
+    # Parse request body
+    body = await request.json()
+    question = body.get("question", "")
+    doc_filter = body.get("doc_filter", None)
     
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty")
@@ -38,9 +42,14 @@ async def ask_question(request: QuestionRequest):
             sources=[]
         )
         
-    print(f"[INFO] Retrieving context for question: '{question}' (no source filter)")
+    print(f"[INFO] Retrieving context for question: '{question}' (filter: {doc_filter})")
     
-    relevant_docs: List[Document] = rag_retriever.retrieve_context(question=question)
+    # Use the new filtering capabilities
+    relevant_docs: List[Document] = rag_retriever.retrieve_context(
+        question=question,
+        filter_criteria=doc_filter,
+        auto_filter=True  # Enable automatic filtering
+    )
     
     print(f"[DEBUG] Retrieved {len(relevant_docs)} chunks. Details:")
     if relevant_docs:

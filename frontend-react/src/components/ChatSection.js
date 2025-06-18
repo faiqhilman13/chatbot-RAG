@@ -4,6 +4,8 @@ import './ChatSection.css';
 
 const ChatSection = ({ className }) => {
   const [question, setQuestion] = useState('');
+  const [documentFilter, setDocumentFilter] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
   const chatContainerRef = useRef(null);
   const { 
     activeChat, 
@@ -69,6 +71,20 @@ const ChatSection = ({ className }) => {
       handleSubmit();
     }
   };
+  
+  const toggleFilters = () => {
+    setShowFilters(!showFilters);
+  };
+
+  const setFilter = (filterType) => {
+    if (filterType === 'cv') {
+      setDocumentFilter({ title: ["cv", "resume", "faiq cv", "faiq hilman", "faiq hilman cv"] });
+    } else if (filterType === 'financial') {
+      setDocumentFilter({ title: ["tesla fy24", "financial report", "earnings report"] });
+    } else {
+      setDocumentFilter(null); // Clear filter
+    }
+  };
 
   const handleSubmit = async () => {
     if (!question.trim()) return;
@@ -77,6 +93,7 @@ const ChatSection = ({ className }) => {
     const userMessage = {
       type: 'user',
       content: question.trim(),
+      filter: documentFilter // Store the filter used with this question
     };
     addMessage(userMessage);
     
@@ -90,7 +107,10 @@ const ChatSection = ({ className }) => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ question: question.trim() })
+        body: JSON.stringify({ 
+          question: question.trim(),
+          doc_filter: documentFilter // Include document filter if set
+        })
       });
 
       const result = await response.json();
@@ -137,7 +157,16 @@ const ChatSection = ({ className }) => {
             className={`chat-message ${message.type === 'user' ? 'chat-question' : 'chat-answer'}`}
           >
             {message.type === 'user' ? (
-              <div>{message.content}</div>
+              <div>
+                {message.content}
+                {message.filter && (
+                  <div className="filter-tag">
+                    {message.filter.title && message.filter.title.includes('cv') ? 'CV/Resume Only' : 
+                     message.filter.title && message.filter.title.includes('tesla') ? 'Financial Reports Only' : 
+                     'Filtered'}
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 <div 
@@ -159,20 +188,56 @@ const ChatSection = ({ className }) => {
           </div>
         ))}
       </div>
-      <div className="chat-input">
-        <textarea
-          value={question}
-          onChange={handleQuestionChange}
-          onKeyDown={handleKeyDown}
-          placeholder="Ask me anything..."
-          disabled={isLoading}
-        />
-        <button 
-          onClick={handleSubmit} 
-          disabled={isLoading || !question.trim()}
-        >
-          {isLoading ? 'Thinking...' : 'Ask'}
-        </button>
+      <div className="chat-input-wrapper">
+        {showFilters && (
+          <div className="filter-options">
+            <button 
+              className={`filter-btn ${documentFilter && documentFilter.title && documentFilter.title.includes('cv') ? 'active' : ''}`}
+              onClick={() => setFilter('cv')}
+            >
+              CV/Resume Only
+            </button>
+            <button 
+              className={`filter-btn ${documentFilter && documentFilter.title && documentFilter.title.includes('tesla') ? 'active' : ''}`}
+              onClick={() => setFilter('financial')}
+            >
+              Financial Reports Only
+            </button>
+            <button 
+              className={`filter-btn ${!documentFilter ? 'active' : ''}`}
+              onClick={() => setFilter(null)}
+            >
+              All Documents
+            </button>
+          </div>
+        )}
+        
+        <div className="chat-input">
+          <textarea
+            value={question}
+            onChange={handleQuestionChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask me anything..."
+            disabled={isLoading}
+          />
+          <div className="chat-input-buttons">
+            <button 
+              className="filter-toggle"
+              onClick={toggleFilters}
+              title="Toggle document filters"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+              </svg>
+            </button>
+            <button 
+              onClick={handleSubmit} 
+              disabled={isLoading || !question.trim()}
+            >
+              {isLoading ? 'Thinking...' : 'Ask'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

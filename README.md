@@ -1,108 +1,240 @@
 # Hybrid RAG Chatbot
 
-A hybrid RAG (Retrieval Augmented Generation) chatbot system for answering questions based on PDF documents. The system uses FAISS for vector storage, Sentence Transformers for embeddings, and Ollama for generating responses (with fallback mechanisms when Ollama is unavailable).
+A sophisticated Retrieval-Augmented Generation (RAG) chatbot built with FastAPI and React that provides intelligent document-based question answering with advanced source filtering capabilities.
 
-## Features
+## 🚀 Key Features
 
-- PDF document processing and chunking
-- FAISS vector database for semantic search
-- Integration with Ollama for LLM-powered responses
-- Fallback mechanisms when Ollama is unavailable
-- FastAPI backend with HTML/JS frontend
-- Document management (upload, list)
-- Question answering based on uploaded documents
+### 🎯 **Advanced Source Filtering**
+- **Intelligent Document Filtering**: Automatically detects query intent and applies appropriate document filters
+- **Manual Filter Controls**: Users can manually select document types (CV/Resume, Financial Reports, All Documents)
+- **Automatic Intent Detection**: System recognizes personal vs. financial queries and filters accordingly
+- **Fallback Expansion**: Automatically expands search when filtering returns insufficient results
 
-## Requirements
+### 🧠 **Enhanced RAG Pipeline**
+- **Two-Stage Retrieval**: Uses BAAI/bge-large-en-v1.5 embeddings with cross-encoder reranking
+- **Advanced Prompt Engineering**: LLM validates source relevance before generating responses
+- **Quality over Quantity**: Prioritizes relevant sources over raw document count
+- **Source Validation**: Explicitly ignores irrelevant documents (e.g., financial docs for personal questions)
 
-- Python 3.9+
-- Sentence Transformers
-- FAISS
-- PyPDF
-- FastAPI
-- Ollama (optional, for better responses)
+### 🎨 **Modern React Frontend**
+- **Component-Based Architecture**: Clean, maintainable React.js implementation
+- **Chat History Persistence**: Local storage-based chat session management
+- **Responsive Design**: Works seamlessly across desktop and mobile devices
+- **Filter Interface**: Intuitive toggle-based filtering with visual indicators
 
-## Installation
+### 🔧 **Technical Stack**
+- **Backend**: FastAPI with Python 3.8+
+- **Frontend**: React.js with modern hooks and context
+- **Embeddings**: BAAI/bge-large-en-v1.5 (upgraded from all-MiniLM-L6-v2)
+- **Reranking**: cross-encoder/ms-marco-MiniLM-L-6-v2
+- **LLM**: Ollama with llama3:8b model
+- **Vector Store**: FAISS with efficient similarity search
+- **Document Processing**: PyPDF with intelligent chunking
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/hybrid-rag-chatbot.git
-cd hybrid-rag-chatbot
+## 📋 Prerequisites
+
+- Python 3.8 or higher
+- Node.js 14 or higher
+- Ollama installed and running (for LLM functionality)
+- Git
+
+## 🛠️ Installation
+
+### Backend Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd chatbot-RAG
+   ```
+
+2. **Create and activate virtual environment:**
+   ```bash
+   python -m venv venv
+   # On Windows:
+   venv\Scripts\activate
+   # On macOS/Linux:
+   source venv/bin/activate
+   ```
+
+3. **Install Python dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Install and start Ollama:**
+   ```bash
+   # Install Ollama from https://ollama.ai
+   ollama pull llama3:8b
+   ```
+
+5. **Start the backend server:**
+   ```bash
+   cd chatbot-RAG
+   python -m uvicorn app.main:app --reload --port 8080
+   ```
+
+### Frontend Setup
+
+1. **Navigate to frontend directory:**
+   ```bash
+   cd frontend-react
+   ```
+
+2. **Install Node.js dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Start the React development server:**
+   ```bash
+   npm start
+   ```
+
+The application will be available at:
+- Frontend: http://localhost:5170
+- Backend API: http://localhost:8080
+
+## 🎯 Usage
+
+### Document Upload
+1. Navigate to the **Upload** page using the sidebar
+2. Select a PDF document
+3. Optionally provide a custom title
+4. Click "Upload and Process" to add it to the knowledge base
+
+### Intelligent Querying
+1. Go to the **Chat** page
+2. Ask questions about your documents
+3. The system automatically applies appropriate filters:
+   - **Personal queries** (experience, education, skills) → CV/Resume documents
+   - **Financial queries** (revenue, earnings, reports) → Financial documents
+4. Use the filter toggle for manual control over document selection
+
+### Document Management
+1. Visit the **Documents** page to view all uploaded files
+2. Delete documents that are no longer needed
+3. Refresh the list to see current status
+
+## 🔍 Filter Examples
+
+The system automatically detects query intent:
+
+```
+"Tell me about Faiq's experience at EY"
+→ Automatically filters to CV/Resume documents
+
+"What was Tesla's revenue in FY24?"
+→ Automatically filters to Financial Report documents
+
+"Summarize all documents"
+→ Uses all available documents
 ```
 
-2. Install the required packages:
-```bash
-pip install -r requirements.txt
+## 🧪 Testing the Improvements
+
+To test the source filtering improvements:
+
+1. Upload both a CV/resume and a financial report
+2. Ask: "List me all of Faiq's experience at EY"
+3. Verify that only CV/resume sources appear in the response
+4. Check that financial document content is ignored
+
+## 🔧 Configuration
+
+Key configuration options in `app/config.py`:
+
+```python
+# Model Settings
+LLM_MODEL_NAME = "llama3:8b"
+EMBEDDING_MODEL = "BAAI/bge-large-en-v1.5"
+CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+# Retrieval Settings
+CHUNK_SIZE = 500
+CHUNK_OVERLAP = 50
+RETRIEVAL_K = 5  # Final results after reranking
+RETRIEVAL_CANDIDATES = 20  # Initial candidates before reranking
 ```
 
-3. (Optional) Install and start Ollama:
-   - Follow instructions at [Ollama's website](https://ollama.ai/) to install
-   - Pull the required model: `ollama pull mistral`
-   - Start the Ollama server
-
-## Usage
-
-1. Start the server:
-```bash
-python -m uvicorn app.main:app --reload
-```
-
-2. Open your browser and navigate to `http://localhost:8000`
-
-3. Upload PDF documents through the web interface
-
-4. Ask questions about the uploaded documents
-
-## Project Structure
+## 📊 Architecture
 
 ```
-chatbot/
-├── app/
-│   ├── config.py             # Configuration settings
-│   ├── main.py               # FastAPI app and main endpoints
-│   ├── utils/
-│   │   └── file_loader.py    # PDF processing utilities
-│   ├── retrievers/
-│   │   └── rag.py            # RAG retrieval system
-│   ├── llm/
-│   │   └── ollama_runner.py  # LLM integration
-│   └── routers/
-│       └── ask.py            # QA endpoints
-├── data/
-│   ├── documents/            # Uploaded PDF storage
-│   └── vector_store/         # FAISS vector database
-└── requirements.txt          # Project dependencies
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   React.js      │    │   FastAPI        │    │   Ollama        │
+│   Frontend      │◄──►│   Backend        │◄──►│   LLM Service   │
+│                 │    │                  │    │                 │
+│ • Chat Interface│    │ • Source Filter  │    │ • llama3:8b     │
+│ • Filter Controls│   │ • Intent Detection│   │ • Response Gen  │
+│ • Document Mgmt │    │ • RAG Pipeline   │    │                 │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                       ┌──────────────────┐
+                       │   FAISS Vector   │
+                       │   Store          │
+                       │                  │
+                       │ • BGE Embeddings │
+                       │ • Cross-Encoder  │
+                       │ • Metadata Index │
+                       └──────────────────┘
 ```
 
-## Architecture Notes
+## 🎉 Recent Improvements
 
-The application employs a standard RAG architecture:
+### ✅ Source Filtering System
+- Intelligent document filtering with automatic intent detection
+- Manual filter controls with visual feedback
+- Fallback expansion when filtering returns too few results
 
-1.  **Frontend:** An HTML/JavaScript interface (served by FastAPI) allows users to upload PDFs and ask questions.
-2.  **Backend (FastAPI):** Handles API requests for document upload, listing, deletion, and question answering.
-3.  **Document Processing (`app/utils/file_loader.py`):** Extracts text from PDFs, splits it into chunks, and generates embeddings using Sentence Transformers (`all-MiniLM-L6-v2`).
-4.  **Vector Store (FAISS):** Stores the document chunk embeddings for efficient similarity search. The FAISS index (`index.faiss` and `index.pkl`) is saved locally in `data/vector_store/`.
-5.  **Retriever (`app/retrievers/rag.py`):** Takes a user's question, embeds it, and queries the FAISS vector store to find the most relevant document chunks (`k=5` by default).
-6.  **LLM Integration (`app/llm/ollama_runner.py`):** Sends the user's question along with the retrieved context chunks to an Ollama instance (running a model like Mistral) to generate a final answer. If Ollama is unavailable, it falls back to returning the raw retrieved context.
-7.  **Document Index (`data/document_index.json`):** A simple JSON file maintains a mapping between uploaded document metadata (title, filename) and a unique ID, used for listing and deleting documents.
+### ✅ Enhanced Prompt Engineering
+- Source validation instructions for LLM
+- Document type awareness to ignore irrelevant sources
+- Self-critique mechanism for better accuracy
 
-### Vector Store Deletion Handling
+### ✅ Upgraded Models
+- BAAI/bge-large-en-v1.5 embeddings (improved from all-MiniLM-L6-v2)
+- cross-encoder/ms-marco-MiniLM-L-6-v2 reranking
+- llama3:8b LLM (upgraded from mistral)
 
-A key challenge addressed during development was ensuring that deleting a document properly removed its context from the system.
+## 🚀 Future Enhancements
 
-*   **Initial Problem:** The initial implementation of the document deletion endpoint (`DELETE /documents/{doc_id}`) successfully removed the document's entry from `document_index.json` and deleted the source PDF file. However, it did *not* remove the corresponding vector embeddings from the FAISS index file (`data/vector_store/index.faiss`). This meant that even after a document was "deleted", its content could still be retrieved and used in answers, leading to incorrect or irrelevant responses.
+- [ ] Performance benchmarking and evaluation metrics
+- [ ] Additional document type support beyond PDF
+- [ ] Advanced analytics and usage insights
+- [ ] Real-time response streaming
+- [ ] Document preview and highlighting
+- [ ] Custom user-defined filters and tags
 
-*   **Fix Implemented:** The `DELETE /documents/{doc_id}` endpoint in `app/main.py` was modified to implement a "nuke and rebuild" strategy for the vector store upon deletion:
-    1.  The document entry is removed from `document_index.json`.
-    2.  The original PDF file is deleted from `data/documents/`.
-    3.  The system identifies all *remaining* documents based on the updated `document_index.json`.
-    4.  It re-processes all chunks for these remaining documents.
-    5.  A completely *new* FAISS index is built from scratch using only the chunks from the remaining documents. This new index overwrites the old `index.faiss` and `index.pkl` files.
-    6.  If no documents remain after deletion, the `index.faiss` and `index.pkl` files are explicitly deleted.
-    7.  The in-memory cache of the vector store (`rag_retriever.vectorstore`) is cleared to force a reload from the updated disk state on the next query.
+## 🤝 Contributing
 
-*   **Outcome:** This ensures the FAISS vector store always accurately reflects the currently indexed documents. Context from deleted documents is reliably removed, preventing outdated information from influencing search results and LLM responses.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## Testing
+## 📄 License
 
-Run the test script to verify the application functionality:
-```
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🆘 Troubleshooting
+
+### Common Issues
+
+**Ollama Connection Error:**
+- Ensure Ollama is installed and running: `ollama serve`
+- Check if the model is available: `ollama list`
+- Pull the required model: `ollama pull llama3:8b`
+
+**Frontend Not Loading:**
+- Verify Node.js version (14+)
+- Clear npm cache: `npm cache clean --force`
+- Delete node_modules and reinstall: `rm -rf node_modules && npm install`
+
+**Empty Responses:**
+- Upload documents first before asking questions
+- Check that the vector store is properly initialized
+- Verify document processing completed successfully
+
+For more issues, check the console logs and ensure all dependencies are properly installed.
