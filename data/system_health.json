@@ -1,16 +1,5 @@
 [
   {
-    "timestamp": "2025-06-18T21:50:48.636425",
-    "avg_processing_time": 4.0156029633113315,
-    "successful_queries": 35,
-    "failed_queries": 0,
-    "avg_quality_score": 4.236028000864106,
-    "avg_confidence_score": 0.9687662772089717,
-    "memory_usage_mb": 25954.01171875,
-    "cpu_usage_percent": 29.3,
-    "active_sessions": 0
-  },
-  {
     "timestamp": "2025-06-18T21:51:19.649116",
     "avg_processing_time": 4.0156029633113315,
     "successful_queries": 35,
@@ -1097,6 +1086,17 @@
     "avg_confidence_score": 0.9683972315133869,
     "memory_usage_mb": 25019.34375,
     "cpu_usage_percent": 21.2,
+    "active_sessions": 0
+  },
+  {
+    "timestamp": "2025-06-18T22:45:22.128028",
+    "avg_processing_time": 4.4190964850973575,
+    "successful_queries": 47,
+    "failed_queries": 0,
+    "avg_quality_score": 4.192737125620126,
+    "avg_confidence_score": 0.9683972315133869,
+    "memory_usage_mb": 24740.30078125,
+    "cpu_usage_percent": 24.7,
     "active_sessions": 0
   }
 ]
