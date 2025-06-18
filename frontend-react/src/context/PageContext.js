@@ -5,6 +5,8 @@ export const PAGES = {
   CHAT: 'chat',
   DOCUMENTS: 'documents',
   UPLOAD: 'upload',
+  MONITORING: 'monitoring',
+  FEEDBACK: 'feedback',
 };
 
 // Create context

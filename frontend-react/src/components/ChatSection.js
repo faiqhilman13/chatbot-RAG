@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChat } from '../context/ChatContext';
+import FeedbackButtons from './FeedbackButtons';
 import './ChatSection.css';
 
 const ChatSection = ({ className }) => {
@@ -120,11 +121,19 @@ const ChatSection = ({ className }) => {
         throw new Error(result.detail || `Error fetching answer (${response.status})`);
       }
 
-      // Add bot's answer to chat
+      // Add bot's answer to chat with feedback metadata
       const botMessage = {
         type: 'bot',
         content: result.answer,
-        sources: result.sources || []
+        sources: result.sources || [],
+        sessionId: result.session_id,
+        retrievalMethod: result.retrieval_method,
+        retrievalK: result.retrieval_k,
+        rerankThreshold: result.rerank_threshold,
+        qualityScore: result.quality_score,
+        confidenceScore: result.confidence_score,
+        responseTime: result.response_time,
+        question: question.trim() // Store the original question for feedback
       };
       addMessage(botMessage);
     } catch (error) {
@@ -183,6 +192,22 @@ const ChatSection = ({ className }) => {
                       </div>
                     ))}
                   </div>
+                )}
+                {!message.error && message.sessionId && (
+                  <FeedbackButtons
+                    sessionId={message.sessionId}
+                    query={message.question}
+                    answer={message.content}
+                    retrievalMethod={message.retrievalMethod}
+                    retrievalK={message.retrievalK}
+                    rerankThreshold={message.rerankThreshold}
+                    qualityScore={message.qualityScore}
+                    confidenceScore={message.confidenceScore}
+                    responseTime={message.responseTime}
+                    onFeedbackSubmitted={(rating, feedbackId) => {
+                      console.log(`Feedback submitted: ${rating} (ID: ${feedbackId})`);
+                    }}
+                  />
                 )}
               </>
             )}

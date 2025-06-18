@@ -43,11 +43,38 @@ async def get_quality_summary(user: dict = Depends(require_auth)):
 
 @router.get("/quality/recent")
 async def get_recent_quality_metrics(limit: int = 50, user: dict = Depends(require_auth)):
-    """Get recent answer quality metrics"""
+    """Get recent query metrics from performance monitor"""
     try:
-        answer_evaluator = ollama_runner.answer_evaluator
-        recent_metrics = answer_evaluator.get_recent_metrics(limit=limit)
-        return {"metrics": recent_metrics}
+        import json
+        from pathlib import Path
+        
+        # Load fresh data directly from the JSON file
+        metrics_file = Path("data/query_metrics.json")
+        if not metrics_file.exists():
+            return {"metrics": []}
+        
+        with open(metrics_file, 'r') as f:
+            all_queries = json.load(f)
+        
+        # Sort by timestamp (most recent first) and take the limit
+        sorted_queries = sorted(all_queries, key=lambda x: x.get('timestamp', ''), reverse=True)
+        recent_queries = sorted_queries[:limit]
+        
+        # Convert to the expected format
+        formatted_metrics = []
+        for query_data in recent_queries:
+            if isinstance(query_data, dict):
+                formatted_metrics.append({
+                    'timestamp': query_data.get('timestamp', ''),
+                    'query': query_data.get('query_text', ''),
+                    'processing_time': query_data.get('processing_time', 0),
+                    'answer_quality_score': query_data.get('answer_quality_score', 0),
+                    'confidence_score': query_data.get('confidence_score', 0),
+                    'retrieval_method': query_data.get('retrieval_method', 'N/A'),
+                    'error_occurred': query_data.get('error_occurred', False)
+                })
+        
+        return {"metrics": formatted_metrics}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching recent metrics: {str(e)}")
 

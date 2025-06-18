@@ -1,0 +1,26 @@
+{
+  "config": {
+    "min_feedback_for_adjustment": 5,
+    "adjustment_sensitivity": 0.7,
+    "negative_feedback_threshold": 0.4,
+    "positive_feedback_boost": 0.8,
+    "k_adjustment_range": [
+      3,
+      15
+    ],
+    "rerank_threshold_range": [
+      0.1,
+      0.9
+    ],
+    "adjustment_cooldown_hours": 2,
+    "quality_weight": 0.6,
+    "user_rating_weight": 0.4
+  },
+  "optimal_params": {
+    "retrieval_k": 7,
+    "rerank_threshold": 0.6,
+    "hybrid_weight": 0.5,
+    "quality_threshold": 3.0
+  },
+  "last_updated": "2025-06-18T22:21:26.024712"
+}

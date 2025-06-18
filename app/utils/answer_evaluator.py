@@ -501,3 +501,15 @@ OVERALL: [average of the four scores]"""
                 })
         
         return alerts 
+
+# Global answer evaluator instance
+_answer_evaluator = None
+
+def get_answer_evaluator() -> AnswerEvaluator:
+    """Get global answer evaluator instance"""
+    global _answer_evaluator
+    if _answer_evaluator is None:
+        # Import here to avoid circular imports
+        from app.llm.ollama_runner import ollama_runner
+        _answer_evaluator = AnswerEvaluator(ollama_runner=ollama_runner)
+    return _answer_evaluator 

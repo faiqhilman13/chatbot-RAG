@@ -10,7 +10,7 @@ import uuid
 from pathlib import Path
 import sys # Add import for sys
 import json # Add import for json
-from app.routers import ask, auth, monitoring, eval
+from app.routers import ask, auth, monitoring, eval, feedback
 from app.config import DOCUMENTS_DIR, VECTORSTORE_DIR, BASE_DIR, SESSION_SECRET_KEY, MAX_FILE_SIZE, ALLOWED_EXTENSIONS
 from app.retrievers.rag import rag_retriever
 from app.utils.file_loader import prepare_documents
@@ -46,6 +46,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(ask.router, prefix="/api")
 app.include_router(monitoring.router, prefix="/api/monitoring", tags=["Monitoring"])
 app.include_router(eval.router, prefix="/api/eval", tags=["Evaluation"])
+app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 
 # Security headers middleware
 @app.middleware("http")

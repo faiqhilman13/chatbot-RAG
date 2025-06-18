@@ -4,11 +4,17 @@ from app.retrievers.rag import rag_retriever
 from app.llm.ollama_runner import ollama_runner
 from app.config import DOCUMENTS_DIR
 from app.auth import require_auth
+from app.utils.feedback_system import get_feedback_system
+from app.utils.performance_monitor import get_performance_monitor, QueryMetrics
+from app.utils.answer_evaluator import get_answer_evaluator
 import os
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, validator
 from langchain.schema import Document
 import re
+import uuid
+import time
+from datetime import datetime
 
 router = APIRouter(tags=["qa"])
 
@@ -58,74 +64,197 @@ class QuestionResponse(BaseModel):
     question: str
     answer: str
     sources: List[SourceDocument]
+    session_id: str = Field(..., description="Session ID for feedback tracking")
+    retrieval_method: str = Field(..., description="Retrieval method used")
+    retrieval_k: int = Field(..., description="K value used for retrieval")
+    rerank_threshold: float = Field(..., description="Reranker threshold used")
+    quality_score: Optional[float] = Field(None, description="Answer quality score")
+    confidence_score: Optional[float] = Field(None, description="Answer confidence score")
+    response_time: Optional[float] = Field(None, description="Total response time in seconds")
 
 @router.post("/ask", response_model=QuestionResponse)
 async def ask_question(question_request: QuestionRequest, current_user: str = Depends(require_auth)):
     """Ask a question and get an answer using RAG"""
+    # Generate session ID and query ID for tracking
+    session_id = str(uuid.uuid4())
+    query_id = f"query_{int(time.time())}_{session_id[:8]}"
+    
+    # Get monitoring instances
+    performance_monitor = get_performance_monitor()
+    answer_evaluator = get_answer_evaluator()
+    
+    # Get optimal parameters from feedback system
+    feedback_system = get_feedback_system()
+    optimal_params = feedback_system.get_optimal_parameters()
+    
     # Use validated Pydantic model instead of raw JSON
     question = question_request.question
     doc_filter = question_request.doc_filter
     
-    if not rag_retriever.load_vectorstore():
-        return QuestionResponse(
+    # Start timing
+    start_time = time.time()
+    error_occurred = False
+    error_message = None
+    
+    try:
+        # Track session
+        performance_monitor.add_session(session_id)
+        
+        if not rag_retriever.load_vectorstore():
+            error_message = "Vector store not initialized"
+            error_occurred = True
+            return QuestionResponse(
+                question=question,
+                answer="Vector store not initialized. Please upload documents first.",
+                sources=[],
+                session_id=session_id,
+                retrieval_method="none",
+                retrieval_k=0,
+                rerank_threshold=0.0,
+                response_time=time.time() - start_time
+            )
+            
+        print(f"[INFO] Retrieving context for question: '{question}' (filter: {doc_filter})")
+        print(f"[INFO] Using optimal parameters: K={optimal_params.get('retrieval_k', 5)}, threshold={optimal_params.get('rerank_threshold', 0.7)}")
+        
+        # Use the new filtering capabilities with optimal parameters
+        retrieval_start = time.time()
+        relevant_docs: List[Document] = rag_retriever.retrieve_context(
             question=question,
-            answer="Vector store not initialized. Please upload documents first.",
-            sources=[]
+            filter_criteria=doc_filter,
+            auto_filter=True,  # Enable automatic filtering
+            top_k=optimal_params.get('retrieval_k', 5),  # Use optimal K from feedback
+            rerank_threshold=optimal_params.get('rerank_threshold', 0.7)  # Use optimal threshold
+        )
+        retrieval_time = time.time() - retrieval_start
+        
+        # Determine retrieval method used
+        retrieval_method = getattr(rag_retriever, '_last_retrieval_method', 'hybrid')
+        
+        print(f"[DEBUG] Retrieved {len(relevant_docs)} chunks. Details:")
+        if relevant_docs:
+            for i, doc in enumerate(relevant_docs):
+                source = doc.metadata.get("source", "N/A")
+                title = doc.metadata.get("title", "N/A")
+                page = doc.metadata.get("page", "N/A")
+                content_snippet = doc.page_content[:100].replace("\n", " ") + "..."
+                print(f"  - Chunk {i}: Source='{source}', Title='{title}', Page={page}, Content='{content_snippet}'")
+        else:
+            print("  - No relevant chunks found.")
+        
+        if not relevant_docs:
+            return QuestionResponse(
+                question=question,
+                answer="I couldn't find any relevant information to answer your question.",
+                sources=[],
+                session_id=session_id,
+                retrieval_method=retrieval_method,
+                retrieval_k=optimal_params.get('retrieval_k', 5),
+                rerank_threshold=optimal_params.get('rerank_threshold', 0.7),
+                response_time=time.time() - start_time
+            )
+        
+        context = "\n\n".join([doc.page_content for doc in relevant_docs])
+        
+        formatted_sources = [
+            SourceDocument(
+                source=doc.metadata.get("source"),
+                title=doc.metadata.get("title"),
+                page=doc.metadata.get("page")
+            ) 
+            for doc in relevant_docs
+        ]
+
+        print(f"[INFO] Sending question and context to LLM.")
+        
+        llm_start = time.time()
+        answer = ollama_runner.get_answer_from_context(question, context, relevant_docs)
+        llm_time = time.time() - llm_start
+        total_time = time.time() - start_time
+        
+        print(f"[INFO] Received answer from LLM. Total time: {total_time:.2f}s")
+        
+        # Evaluate answer quality using the answer evaluator
+        try:
+            evaluation_result = answer_evaluator.evaluate_answer_quality(
+                query=question,
+                answer=answer,
+                context=[doc.page_content for doc in relevant_docs],
+                processing_time=total_time
+            )
+            quality_score = evaluation_result.overall_score
+            confidence_score = evaluation_result.confidence_score
+        except Exception as eval_error:
+            print(f"[WARNING] Answer evaluation failed: {eval_error}")
+            quality_score = 3.0  # Default neutral score
+            confidence_score = 0.8  # Default confidence
+        
+        # Create monitoring metrics
+        query_metrics = QueryMetrics(
+            query_id=query_id,
+            query_text=question,
+            timestamp=datetime.now().isoformat(),
+            processing_time=total_time,
+            retrieval_time=retrieval_time,
+            llm_time=llm_time,
+            total_chunks_retrieved=len(relevant_docs),
+            final_chunks_used=len(relevant_docs),
+            retrieval_method=retrieval_method,
+            answer_quality_score=quality_score,
+            confidence_score=confidence_score,
+            error_occurred=error_occurred,
+            error_message=error_message
         )
         
-    print(f"[INFO] Retrieving context for question: '{question}' (filter: {doc_filter})")
-    
-    # Use the new filtering capabilities with timing
-    import time
-    retrieval_start = time.time()
-    relevant_docs: List[Document] = rag_retriever.retrieve_context(
-        question=question,
-        filter_criteria=doc_filter,
-        auto_filter=True  # Enable automatic filtering
-    )
-    retrieval_time = time.time() - retrieval_start
-    
-    print(f"[DEBUG] Retrieved {len(relevant_docs)} chunks. Details:")
-    if relevant_docs:
-        for i, doc in enumerate(relevant_docs):
-            source = doc.metadata.get("source", "N/A")
-            title = doc.metadata.get("title", "N/A")
-            page = doc.metadata.get("page", "N/A")
-            content_snippet = doc.page_content[:100].replace("\n", " ") + "..."
-            print(f"  - Chunk {i}: Source='{source}', Title='{title}', Page={page}, Content='{content_snippet}'")
-    else:
-        print("  - No relevant chunks found.")
-    
-    if not relevant_docs:
+        # Record metrics in monitoring system
+        performance_monitor.record_query_metrics(query_metrics)
+        
         return QuestionResponse(
             question=question,
-            answer="I couldn't find any relevant information to answer your question.",
-            sources=[]
+            answer=answer,
+            sources=formatted_sources,
+            session_id=session_id,
+            retrieval_method=retrieval_method,
+            retrieval_k=optimal_params.get('retrieval_k', 5),
+            rerank_threshold=optimal_params.get('rerank_threshold', 0.7),
+            quality_score=quality_score,
+            confidence_score=confidence_score,
+            response_time=total_time
         )
-    
-    context = "\n\n".join([doc.page_content for doc in relevant_docs])
-    
-    formatted_sources = [
-        SourceDocument(
-            source=doc.metadata.get("source"),
-            title=doc.metadata.get("title"),
-            page=doc.metadata.get("page")
-        ) 
-        for doc in relevant_docs
-    ]
-
-    print(f"[INFO] Sending question and context to LLM.")
-    # Pass retrieval time to LLM for metrics tracking
-    if hasattr(ollama_runner, '_last_retrieval_time'):
-        ollama_runner._last_retrieval_time = retrieval_time
-    answer = ollama_runner.get_answer_from_context(question, context, relevant_docs)
-    print(f"[INFO] Received answer from LLM.")
-    
-    return QuestionResponse(
-        question=question,
-        answer=answer,
-        sources=formatted_sources
-    )
+        
+    except Exception as e:
+        error_occurred = True
+        error_message = str(e)
+        total_time = time.time() - start_time
+        
+        print(f"[ERROR] Query processing failed: {e}")
+        
+        # Still record metrics for failed queries
+        try:
+            query_metrics = QueryMetrics(
+                query_id=query_id,
+                query_text=question,
+                timestamp=datetime.now().isoformat(),
+                processing_time=total_time,
+                retrieval_time=0.0,
+                llm_time=0.0,
+                total_chunks_retrieved=0,
+                final_chunks_used=0,
+                retrieval_method="error",
+                answer_quality_score=0.0,
+                confidence_score=0.0,
+                error_occurred=True,
+                error_message=error_message
+            )
+            performance_monitor.record_query_metrics(query_metrics)
+        except Exception as metric_error:
+            print(f"[ERROR] Failed to record error metrics: {metric_error}")
+        
+        raise HTTPException(status_code=500, detail=f"Query processing failed: {str(e)}")
+        
+    finally:
+        # Clean up session tracking
+        performance_monitor.remove_session(session_id)
 
 @router.post("/upload_and_process")
 async def upload_and_process(file_path: str, current_user: str = Depends(require_auth)):

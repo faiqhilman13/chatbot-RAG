@@ -1,0 +1,18 @@
+[
+  {
+    "parameter_name": "retrieval_k",
+    "old_value": 5,
+    "new_value": 7,
+    "reason": "Increasing K from 5 to 7 due to poor performance (score: 0.311)",
+    "confidence": 0.8,
+    "timestamp": "2025-06-18T22:21:26.021324"
+  },
+  {
+    "parameter_name": "rerank_threshold",
+    "old_value": 0.7,
+    "new_value": 0.6,
+    "reason": "Lowering rerank threshold from 0.70 to 0.60 due to poor performance",
+    "confidence": 0.7,
+    "timestamp": "2025-06-18T22:21:26.021324"
+  }
+]

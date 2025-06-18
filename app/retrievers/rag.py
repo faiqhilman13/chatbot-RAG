@@ -485,7 +485,9 @@ class RAGRetriever:
     def retrieve_context(self, question: str, k: int = None, 
                         filter_criteria: Dict[str, Any] = None,
                         auto_filter: bool = True,
-                        use_adaptive_retrieval: bool = True) -> List[Document]:
+                        use_adaptive_retrieval: bool = True,
+                        top_k: int = None,
+                        rerank_threshold: float = None) -> List[Document]:
         """Retrieve relevant document chunks for a question with adaptive intelligence.
         
         Args:
@@ -494,6 +496,8 @@ class RAGRetriever:
             filter_criteria: Optional dictionary of metadata filters to apply
             auto_filter: Whether to automatically detect query intent and apply filters
             use_adaptive_retrieval: Whether to use adaptive retrieval intelligence
+            top_k: Override K from feedback optimal parameters
+            rerank_threshold: Override rerank threshold from feedback optimal parameters
             
         Returns:
             A list of relevant Document objects with enhanced source attribution.
@@ -503,22 +507,26 @@ class RAGRetriever:
                 print("[Retriever] Vectorstore not loaded, returning empty list.")
                 return []
         
+        # Initialize retrieval method tracking
+        retrieval_method = "dense"  # Default method
+        self._last_retrieval_method = retrieval_method
+        
         # 🧠 ADAPTIVE RETRIEVAL INTELLIGENCE
         if use_adaptive_retrieval:
             # Analyze query to determine optimal parameters
             query_analysis = self.query_analyzer.analyze_query(question)
             
-            # Use adaptive K if not explicitly provided
+            # Use adaptive K if not explicitly provided (but allow feedback override)
             if k is None:
-                k = query_analysis.optimal_k
-                print(f"[AdaptiveRetrieval] Using adaptive K={k} for {query_analysis.query_type.value} query with {query_analysis.complexity.value} complexity")
+                k = top_k if top_k is not None else query_analysis.optimal_k
+                print(f"[AdaptiveRetrieval] Using K={k} for {query_analysis.query_type.value} query with {query_analysis.complexity.value} complexity")
             
             # Note: Adaptive chunk size would require re-chunking documents
             # For now, we'll use this information for future optimizations
             print(f"[AdaptiveRetrieval] Recommended chunk size: {query_analysis.chunk_size}, overlap: {query_analysis.chunk_overlap}")
         else:
             if k is None:
-                k = RETRIEVAL_K
+                k = top_k if top_k is not None else RETRIEVAL_K
             
         try:
             # Get more candidates than we need for reranking
@@ -574,7 +582,9 @@ class RAGRetriever:
                             hybrid_docs.append(doc)
                     
                     candidate_docs = hybrid_docs
-                    print(f"[HybridRetrieval] Applied {hybrid_results[0].retrieval_method} retrieval strategy")
+                    retrieval_method = hybrid_results[0].retrieval_method
+                    self._last_retrieval_method = retrieval_method
+                    print(f"[HybridRetrieval] Applied {retrieval_method} retrieval strategy")
             
             # Apply metadata filtering if criteria provided
             if filter_criteria:
