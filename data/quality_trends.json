@@ -1,0 +1,20 @@
+[
+  {
+    "period": "hour",
+    "time_key": "2025-06-18-19",
+    "avg_overall_score": 3.179770679770679,
+    "avg_confidence": 0.9179786933079785,
+    "total_queries": 15,
+    "low_quality_count": 0,
+    "timestamp": "2025-06-18T19:36:31.205921"
+  },
+  {
+    "period": "day",
+    "time_key": "2025-06-18",
+    "avg_overall_score": 3.179770679770679,
+    "avg_confidence": 0.9179786933079785,
+    "total_queries": 15,
+    "low_quality_count": 0,
+    "timestamp": "2025-06-18T19:36:31.205921"
+  }
+]

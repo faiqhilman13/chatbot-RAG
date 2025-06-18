@@ -1,5 +1,8 @@
 from langchain_community.vectorstores import FAISS
 from app.config import EMBEDDING_MODEL, VECTORSTORE_DIR, RETRIEVAL_K, RETRIEVAL_CANDIDATES, CROSS_ENCODER_MODEL
+from app.utils.query_analyzer import query_analyzer, QueryAnalysis
+from app.utils.source_attribution import source_attribution_manager
+from app.utils.hybrid_retrieval import HybridRetriever, RetrievalResult
 import os
 import pickle
 from typing import List, Tuple, Optional, Dict, Any, Union
@@ -15,6 +18,9 @@ class RAGRetriever:
         self.embedding_model = EMBEDDING_MODEL
         self.vectorstore_path = VECTORSTORE_DIR
         self.cross_encoder = CROSS_ENCODER_MODEL
+        self.query_analyzer = query_analyzer
+        self.source_attribution = source_attribution_manager
+        self.hybrid_retriever = None
         
     def load_vectorstore(self) -> bool:
         """Load the vectorstore from disk if it exists"""
@@ -56,6 +62,10 @@ class RAGRetriever:
             print(f"Building vectorstore with {len(docs)} documents")
             self.vectorstore = FAISS.from_documents(docs, self.embedding_model)
             self.save_vectorstore()
+            
+            # Initialize hybrid retriever with document corpus
+            self._initialize_hybrid_retriever(docs)
+            
             return True
         except Exception as e:
             print(f"Error building vectorstore: {str(e)}")
@@ -74,6 +84,25 @@ class RAGRetriever:
         except Exception as e:
             print(f"Error saving vectorstore: {str(e)}")
             return False
+    
+    def _initialize_hybrid_retriever(self, docs):
+        """Initialize hybrid retriever with document corpus"""
+        try:
+            document_texts = [doc.page_content for doc in docs]
+            document_metadata = [doc.metadata for doc in docs]
+            
+            self.hybrid_retriever = HybridRetriever(
+                dense_weight=0.7,
+                sparse_weight=0.3,
+                fallback_threshold=0.1
+            )
+            
+            self.hybrid_retriever.fit(document_texts, document_metadata)
+            print(f"Initialized hybrid retriever with {len(document_texts)} documents")
+            
+        except Exception as e:
+            print(f"Error initializing hybrid retriever: {str(e)}")
+            self.hybrid_retriever = None
     
     def _rerank_with_cross_encoder(self, question: str, docs: List[Document], k: int) -> List[Document]:
         """Rerank documents using cross-encoder model.
@@ -359,25 +388,41 @@ class RAGRetriever:
     
     def retrieve_context(self, question: str, k: int = None, 
                         filter_criteria: Dict[str, Any] = None,
-                        auto_filter: bool = True) -> List[Document]:
-        """Retrieve relevant document chunks for a question.
+                        auto_filter: bool = True,
+                        use_adaptive_retrieval: bool = True) -> List[Document]:
+        """Retrieve relevant document chunks for a question with adaptive intelligence.
         
         Args:
             question: The question to retrieve context for.
             k: Number of documents/chunks to retrieve after reranking.
             filter_criteria: Optional dictionary of metadata filters to apply
             auto_filter: Whether to automatically detect query intent and apply filters
+            use_adaptive_retrieval: Whether to use adaptive retrieval intelligence
             
         Returns:
-            A list of relevant Document objects.
+            A list of relevant Document objects with enhanced source attribution.
         """
         if not self.vectorstore:
             if not self.load_vectorstore():
                 print("[Retriever] Vectorstore not loaded, returning empty list.")
                 return []
-                
-        if k is None:
-            k = RETRIEVAL_K
+        
+        # 🧠 ADAPTIVE RETRIEVAL INTELLIGENCE
+        if use_adaptive_retrieval:
+            # Analyze query to determine optimal parameters
+            query_analysis = self.query_analyzer.analyze_query(question)
+            
+            # Use adaptive K if not explicitly provided
+            if k is None:
+                k = query_analysis.optimal_k
+                print(f"[AdaptiveRetrieval] Using adaptive K={k} for {query_analysis.query_type.value} query with {query_analysis.complexity.value} complexity")
+            
+            # Note: Adaptive chunk size would require re-chunking documents
+            # For now, we'll use this information for future optimizations
+            print(f"[AdaptiveRetrieval] Recommended chunk size: {query_analysis.chunk_size}, overlap: {query_analysis.chunk_overlap}")
+        else:
+            if k is None:
+                k = RETRIEVAL_K
             
         try:
             # Get more candidates than we need for reranking
@@ -395,6 +440,45 @@ class RAGRetriever:
             candidate_docs: List[Document] = retriever.get_relevant_documents(question)
             
             print(f"[Retriever] Retrieved {len(candidate_docs)} candidate chunks for question.")
+            
+            # 🌐 HYBRID RETRIEVAL & FALLBACK MECHANISMS
+            # Check if we should use hybrid retrieval fallback
+            if self.hybrid_retriever and candidate_docs:
+                # Get dense scores for fallback evaluation
+                dense_scores = []
+                for doc in candidate_docs:
+                    if hasattr(doc, 'metadata') and 'score' in doc.metadata:
+                        dense_scores.append(doc.metadata['score'])
+                    else:
+                        # Approximate score based on position (first doc gets highest score)
+                        dense_scores.append(1.0 - (candidate_docs.index(doc) / len(candidate_docs)))
+                
+                # Create (index, score) pairs for hybrid retrieval
+                dense_results = [(i, score) for i, score in enumerate(dense_scores)]
+                
+                # Use hybrid retrieval with fallback
+                hybrid_results = self.hybrid_retriever.search_with_fallback(
+                    dense_results, question, top_k=candidates_k
+                )
+                
+                # Convert hybrid results back to Document objects
+                if hybrid_results:
+                    hybrid_docs = []
+                    for result in hybrid_results:
+                        idx = int(result.chunk_id)
+                        if idx < len(candidate_docs):
+                            doc = candidate_docs[idx]
+                            # Add hybrid scores to metadata
+                            doc.metadata.update({
+                                'dense_score': result.dense_score,
+                                'sparse_score': result.sparse_score,
+                                'hybrid_score': result.hybrid_score,
+                                'retrieval_method': result.retrieval_method
+                            })
+                            hybrid_docs.append(doc)
+                    
+                    candidate_docs = hybrid_docs
+                    print(f"[HybridRetrieval] Applied {hybrid_results[0].retrieval_method} retrieval strategy")
             
             # Apply metadata filtering if criteria provided
             if filter_criteria:
@@ -436,6 +520,16 @@ class RAGRetriever:
             relevant_docs = self._score_context_coherence(relevant_docs, k)
                 
             print(f"[Retriever] Final document count after domain-agnostic filtering: {len(relevant_docs)}")
+            
+            # 🧾 ENHANCED SOURCE ATTRIBUTION & CONTEXT MANAGEMENT
+            if use_adaptive_retrieval and relevant_docs:
+                # Create anchored chunks with explicit source metadata
+                relevant_docs = self.source_attribution.create_anchored_chunks(relevant_docs)
+                
+                # Detect cross-document references for better context awareness
+                cross_refs = self.source_attribution.detect_cross_document_references(relevant_docs)
+                if cross_refs:
+                    print(f"[SourceAttribution] Cross-document references detected: {list(cross_refs.keys())}")
             
             # Return the list of documents directly
             return relevant_docs

@@ -1,0 +1,22 @@
+[
+  {
+    "alert_id": "high_memory_1750246190",
+    "alert_type": "high_memory",
+    "severity": "high",
+    "message": "Memory usage 26801MB exceeds threshold 2048MB",
+    "timestamp": "2025-06-18T19:29:50.257714",
+    "metric_value": 26801.4765625,
+    "threshold": 2048,
+    "resolved": false
+  },
+  {
+    "alert_id": "high_cpu_1750246933",
+    "alert_type": "high_cpu",
+    "severity": "medium",
+    "message": "CPU usage 80.5% exceeds threshold 80.0%",
+    "timestamp": "2025-06-18T19:42:13.558215",
+    "metric_value": 80.5,
+    "threshold": 80.0,
+    "resolved": false
+  }
+]

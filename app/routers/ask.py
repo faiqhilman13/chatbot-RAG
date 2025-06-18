@@ -75,12 +75,15 @@ async def ask_question(question_request: QuestionRequest, current_user: str = De
         
     print(f"[INFO] Retrieving context for question: '{question}' (filter: {doc_filter})")
     
-    # Use the new filtering capabilities
+    # Use the new filtering capabilities with timing
+    import time
+    retrieval_start = time.time()
     relevant_docs: List[Document] = rag_retriever.retrieve_context(
         question=question,
         filter_criteria=doc_filter,
         auto_filter=True  # Enable automatic filtering
     )
+    retrieval_time = time.time() - retrieval_start
     
     print(f"[DEBUG] Retrieved {len(relevant_docs)} chunks. Details:")
     if relevant_docs:
@@ -112,7 +115,10 @@ async def ask_question(question_request: QuestionRequest, current_user: str = De
     ]
 
     print(f"[INFO] Sending question and context to LLM.")
-    answer = ollama_runner.get_answer_from_context(question, context)
+    # Pass retrieval time to LLM for metrics tracking
+    if hasattr(ollama_runner, '_last_retrieval_time'):
+        ollama_runner._last_retrieval_time = retrieval_time
+    answer = ollama_runner.get_answer_from_context(question, context, relevant_docs)
     print(f"[INFO] Received answer from LLM.")
     
     return QuestionResponse(

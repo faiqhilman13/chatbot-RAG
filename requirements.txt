@@ -15,4 +15,11 @@ python-jose[cryptography]
 itsdangerous
 pytest
 pytest-asyncio
-scikit-learn 
+scikit-learn
+spacy>=3.4.0
+
+# Performance monitoring
+psutil>=5.9.0
+
+# For advanced statistical calculations
+numpy>=1.21.0 
