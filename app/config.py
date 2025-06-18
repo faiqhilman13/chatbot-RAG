@@ -3,6 +3,7 @@ from langchain_community.llms import Ollama
 import os
 from pathlib import Path
 from typing import Optional
+from secrets import token_urlsafe
 
 # Base directory using pathlib
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -65,4 +66,16 @@ OLLAMA_BASE_URL = "http://localhost:11434"
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 RETRIEVAL_K = 5  # Final number of documents to retrieve after reranking
-RETRIEVAL_CANDIDATES = 20  # Number of initial candidates to retrieve before reranking 
+RETRIEVAL_CANDIDATES = 20  # Number of initial candidates to retrieve before reranking
+
+# Security Configuration
+SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", token_urlsafe(32))
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")  # Default for demo, should be changed
+
+# File Upload Security
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit
+ALLOWED_EXTENSIONS = {'.pdf'}
+QUARANTINE_DIR = BASE_DIR / "quarantine"
+
+# Ensure quarantine directory exists
+QUARANTINE_DIR.mkdir(parents=True, exist_ok=True) 

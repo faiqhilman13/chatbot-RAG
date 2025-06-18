@@ -9,6 +9,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from passlib.context import CryptContext
 from typing import Optional
 import logging
+from app.config import ADMIN_PASSWORD
 
 logger = logging.getLogger(__name__)
 
@@ -27,26 +28,24 @@ USERS = {
 # Initialize admin password hash
 def init_admin_password():
     """Initialize the admin password hash."""
-    # Using a simple password: admin123
-    admin_password = "admin123"
-    hashed = pwd_context.hash(admin_password)
+    hashed = pwd_context.hash(ADMIN_PASSWORD)
     USERS["admin"]["hashed_password"] = hashed
     logger.info("Admin password hash initialized")
     return hashed
 
 # Initialize on module load
 admin_hash = init_admin_password()
-logger.info(f"Admin password hash: {admin_hash[:20]}...")
+# Removed sensitive hash logging for security
 
 # Password verification functions
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against its hash."""
     try:
         result = pwd_context.verify(plain_password, hashed_password)
-        logger.info(f"Password verification result: {result}")
+        # Removed sensitive logging for security
         return result
     except Exception as e:
-        logger.error(f"Password verification error: {e}")
+        logger.error("Password verification error occurred")  # Don't log actual error details
         return False
 
 def authenticate_user(username: str, password: str) -> Optional[dict]:

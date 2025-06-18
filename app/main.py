@@ -11,7 +11,7 @@ from pathlib import Path
 import sys # Add import for sys
 import json # Add import for json
 from app.routers import ask, auth
-from app.config import DOCUMENTS_DIR, VECTORSTORE_DIR, BASE_DIR # Import BASE_DIR
+from app.config import DOCUMENTS_DIR, VECTORSTORE_DIR, BASE_DIR, SESSION_SECRET_KEY, MAX_FILE_SIZE, ALLOWED_EXTENSIONS
 from app.retrievers.rag import rag_retriever
 from app.utils.file_loader import prepare_documents
 from app.auth import require_auth, optional_auth
@@ -24,20 +24,30 @@ import traceback # Add import for traceback module
 app = FastAPI(title="Hybrid RAG Chatbot")
 
 # Add session middleware (must be added before other middleware that uses sessions)
-app.add_middleware(SessionMiddleware, secret_key="your-secret-key-change-in-production")
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5170"], # Specific frontend origin for credentials
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],  # Restrict methods
+    allow_headers=["Content-Type", "Authorization"],  # Restrict headers
 )
 
 # Include API routers
 app.include_router(auth.router)
 app.include_router(ask.router)
+
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 # --- Define frontend path ---
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
@@ -104,8 +114,24 @@ async def upload_document(
     current_user: str = Depends(require_auth)
 ):
     # CURSOR: Logic should ideally be in a service function
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
+    
+    # Security validations
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+    
+    # Check file extension
+    file_extension = Path(file.filename).suffix.lower()
+    if file_extension not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Only {', '.join(ALLOWED_EXTENSIONS)} files are allowed")
+    
+    # Check file size
+    if hasattr(file, 'size') and file.size > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail=f"File too large. Maximum size: {MAX_FILE_SIZE // (1024*1024)}MB")
+    
+    # Validate filename characters (prevent path traversal)
+    safe_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.() ")
+    if not all(c in safe_chars for c in file.filename):
+        raise HTTPException(status_code=400, detail="Invalid characters in filename")
 
     # Use provided title or filename
     doc_title = title.strip() if title and title.strip() else file.filename

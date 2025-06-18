@@ -64,7 +64,6 @@ const AppContent = () => {
     <PageProvider>
       <ChatProvider>
         <div className="App">
-          <StagewiseToolbar config={{ plugins: [ReactPlugin] }} />
           <Sidebar />
           <MainContent />
         </div>
@@ -76,6 +75,7 @@ const AppContent = () => {
 function App() {
   return (
     <AuthProvider>
+      <StagewiseToolbar config={{ plugins: [ReactPlugin] }} />
       <AppContent />
     </AuthProvider>
   );

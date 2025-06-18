@@ -6,14 +6,48 @@ from app.config import DOCUMENTS_DIR
 from app.auth import require_auth
 import os
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 from langchain.schema import Document
+import re
 
 router = APIRouter(tags=["qa"])
 
 class QuestionRequest(BaseModel):
-    question: str
+    question: str = Field(..., min_length=1, max_length=2000)
     doc_filter: Optional[Dict[str, Any]] = None
+    
+    @validator('question')
+    def validate_question(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Question cannot be empty')
+        
+        # Basic XSS protection - remove potentially dangerous characters
+        dangerous_patterns = [
+            r'<script.*?</script>',
+            r'javascript:',
+            r'on\w+\s*=',
+        ]
+        
+        for pattern in dangerous_patterns:
+            if re.search(pattern, v, re.IGNORECASE):
+                raise ValueError('Question contains invalid content')
+        
+        return v.strip()
+    
+    @validator('doc_filter')
+    def validate_doc_filter(cls, v):
+        if v is not None:
+            # Ensure doc_filter is a dictionary with string keys
+            if not isinstance(v, dict):
+                raise ValueError('doc_filter must be a dictionary')
+            
+            for key, value in v.items():
+                if not isinstance(key, str):
+                    raise ValueError('doc_filter keys must be strings')
+                if len(key) > 100:
+                    raise ValueError('doc_filter keys too long')
+        
+        return v
 
 class SourceDocument(BaseModel):
     source: Optional[str] = None
@@ -26,15 +60,11 @@ class QuestionResponse(BaseModel):
     sources: List[SourceDocument]
 
 @router.post("/ask", response_model=QuestionResponse)
-async def ask_question(request: Request, current_user: str = Depends(require_auth)):
+async def ask_question(question_request: QuestionRequest, current_user: str = Depends(require_auth)):
     """Ask a question and get an answer using RAG"""
-    # Parse request body
-    body = await request.json()
-    question = body.get("question", "")
-    doc_filter = body.get("doc_filter", None)
-    
-    if not question:
-        raise HTTPException(status_code=400, detail="Question cannot be empty")
+    # Use validated Pydantic model instead of raw JSON
+    question = question_request.question
+    doc_filter = question_request.doc_filter
     
     if not rag_retriever.load_vectorstore():
         return QuestionResponse(
