@@ -35,6 +35,8 @@
   display: flex;
   justify-content: center;
   transition: margin-left 0.3s ease, width 0.3s ease;
+  position: relative;
+  z-index: 1;
 }
 
 /* When chat sidebar is visible, adjust main content */
@@ -83,7 +85,8 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: var(--main-bg-color);
+  background: var(--bg-color);
+  position: relative;
 }
 
 .loading-spinner {
@@ -91,6 +94,9 @@
   font-size: 18px;
   font-weight: 500;
   animation: pulse 1.5s ease-in-out infinite alternate;
+  position: relative;
+  z-index: 2;
+  text-shadow: var(--glow-blue);
 }
 
 @keyframes pulse {

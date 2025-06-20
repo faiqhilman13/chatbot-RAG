@@ -1,6 +1,7 @@
 import React from 'react';
 import './App.css';
 import Sidebar from './components/Sidebar';
+import ParticleBackground from './components/ParticleBackground';
 import { PageProvider, usePage, PAGES } from './context/PageContext';
 import { ChatProvider } from './context/ChatContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -55,19 +56,26 @@ const AppContent = () => {
   if (isLoading) {
     return (
       <div className="loading-screen">
+        <ParticleBackground />
         <div className="loading-spinner">Loading...</div>
       </div>
     );
   }
 
   if (!isAuthenticated) {
-    return <LoginPage />;
+    return (
+      <>
+        <ParticleBackground />
+        <LoginPage />
+      </>
+    );
   }
 
   return (
     <PageProvider>
       <ChatProvider>
         <div className="App">
+          <ParticleBackground />
           <Sidebar />
           <MainContent />
         </div>
