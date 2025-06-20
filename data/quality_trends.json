@@ -43,5 +43,23 @@
     "total_queries": 7,
     "low_quality_count": 0,
     "timestamp": "2025-06-18T22:13:53.546794"
+  },
+  {
+    "period": "hour",
+    "time_key": "2025-06-19-08",
+    "avg_overall_score": 4.354761904761904,
+    "avg_confidence": 1.0,
+    "total_queries": 4,
+    "low_quality_count": 0,
+    "timestamp": "2025-06-19T08:11:17.390956"
+  },
+  {
+    "period": "day",
+    "time_key": "2025-06-19",
+    "avg_overall_score": 4.354761904761904,
+    "avg_confidence": 1.0,
+    "total_queries": 4,
+    "low_quality_count": 0,
+    "timestamp": "2025-06-19T08:11:17.390956"
   }
 ]

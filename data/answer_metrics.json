@@ -869,5 +869,57 @@
     "answer": "Based on the provided context, Faiq Hilman's education is:\n\n* Bachelor of Commerce from University Of Melbourne, Australia (Jan 2017 - Dec 2019)\n\nAs for his technical skills, he has mentioned the following programming languages and tools:\n\n* Programming & Data Science: Python, R, Java, JavaScript, HTML, CSS, SQL, SPARQL, Pandas, NumPy, Matplotlib, Seaborn, RDFlib, Regex, Jinja2\n* Machine Learning, AI & Automation: LLM Prompt Engineering, Neural Networks, Random Forest, SVM, Bayesian Optimization, Feature Selection, Supervised Learning, Unsupervised Learning, PCA, RAG Pipelines (LangChain, FAISS, Ollama), Agentic Workflows (n8n), Conversational UIs, Document Parsing & Comparison, Lead Classification Automation\n* Software & Data Engineering: FastAPI, application to accelerate feature delivery and align with strategic objectives, while architecting a scalable microservices solution connecting React.js to Python FastAPI backends, leveraging AWS cloud technologies and CI/CD pipelines to intelligently integrate LLM models and AI agents via RESTful APIs for automated document generation and natural language processing workflows.\n* UI/UX & Visualization: Streamlit (Advanced), React (Proficient), TailwindCSS (Proficient), Material-UI, Vite, Custom JavaScript Enhancements, UI State Management, Dashboard Design, Tableau, Observable, Folium, GeoPandas, RDF, Knowledge Graphs, Data Modeling\n* Cybersecurity, DevOps & Compliance: OT Cybersecurity, e-KYC Vendor Evaluation, Network Security, Secure System Configuration, Risk Assessment, Docker, Containerization, CI/CD Principles, Git, Environment Management, Secure API Deployment, Azure DevOps, AWS DevOps, AWS (S3, Secrets Manager, ECR), Zscaler Certificates.\n\nPlease note that this answer is based solely on the provided context and may not be a comprehensive representation of Faiq Hilman's education or technical skills.",
     "context_quality": 0.3224489795918367,
     "processing_time": 18.062669038772583
+  },
+  {
+    "faithfulness_score": 3.333333333333333,
+    "relevance_score": 2.142857142857143,
+    "completeness_score": 4.5,
+    "clarity_score": 4.5,
+    "overall_score": 3.619047619047619,
+    "confidence_score": 1.0,
+    "timestamp": "2025-06-19T08:11:17.390956",
+    "query": "where did xin yi go for university?",
+    "answer": "Based on the provided context, Xin Yi attended Monash University for their Bachelor of Business and Commerce degree, double majoring in Strategic Marketing and Business Analytics. They also completed a Monash University Foundation Year at Sunway College with Distinction.\n\nAdditionally, Xin Yi attended the University of Melbourne for their undergraduate studies, completing relevant coursework in Financial Statement Analysis, Advanced Financial Management, M&A, Options, Futures & Derivatives, Quantitative Methods, Real Estate Finance, Investments, Financial and Management Accounting.\n\nIt's worth noting that Xin Yi also pursued further education at the University of South Australia, earning a Bachelor of IT (Networking and Cybersecurity) with a GPA of 6.56/7.00.",
+    "context_quality": 0.3836734693877551,
+    "processing_time": 21.78651762008667
+  },
+  {
+    "faithfulness_score": 5.0,
+    "relevance_score": 4.0,
+    "completeness_score": 5.0,
+    "clarity_score": 4.0,
+    "overall_score": 4.5,
+    "confidence_score": 1.0,
+    "timestamp": "2025-06-19T08:12:35.229397",
+    "query": "what is xin yi's education background?",
+    "answer": "According to the provided context, Xin Yi's education background includes:\n\n* Bachelor of IT (Networking and Cybersecurity) from University of South Australia (July 2021 - July 2023)\n* Diploma of IT from South Australian Institute of Business and Technology (Feb 2020- June 2021)\n\nAdditionally, Xin Yi has also completed a few other educational courses and certifications, but these two are the most relevant to their education background.",
+    "context_quality": 0.319047619047619,
+    "processing_time": 8.690373182296753
+  },
+  {
+    "faithfulness_score": 5.0,
+    "relevance_score": 5.0,
+    "completeness_score": 4.0,
+    "clarity_score": 5.0,
+    "overall_score": 4.75,
+    "confidence_score": 1.0,
+    "timestamp": "2025-06-19T08:13:25.248936",
+    "query": "what is jack's education background?",
+    "answer": "According to the provided context, Jack Kho's education background is:\n\n* Bachelor of IT (Networking and Cybersecurity) at University of South Australia from July 2021 to July 2023.\n* GPA: 6.56 / 7.00\n* Diploma of IT at South Australian Institute of Business and Technology from Feb 2020- June 2021.\n* GPA: 6.67 / 7.00\n\nNote that these are the only educational sources provided in the context, and I have not found any other relevant information to add or contradict this answer.",
+    "context_quality": 0.2833333333333333,
+    "processing_time": 8.384478330612183
+  },
+  {
+    "faithfulness_score": 5.0,
+    "relevance_score": 5.0,
+    "completeness_score": 4.5,
+    "clarity_score": 4.5,
+    "overall_score": 4.55,
+    "confidence_score": 1.0,
+    "timestamp": "2025-06-19T08:13:45.144634",
+    "query": "what is chow's education background?",
+    "answer": "According to the provided context, Chow Xinyi has the following education background:\n\n* Bachelor of Business and Commerce, Monash University (Double Major in Strategic Marketing and Business Analytics)\n\t+ Second-Class Honours, GPA 2.652\n\t+ Duration: Jan 2016 - Dec 2018\n\nAdditionally, Chow Xinyi also completed a Monash University Foundation Year at Sunway College with a Distinction and a WAM of 76% (Jan 2015 - Dec 2015).",
+    "context_quality": 0.21666666666666667,
+    "processing_time": 7.990732908248901
   }
 ]

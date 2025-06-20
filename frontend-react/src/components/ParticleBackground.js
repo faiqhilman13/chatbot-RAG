@@ -8,14 +8,14 @@ const ParticleBackground = () => {
       <Particles
         particleColors={['#00ffff', '#c27cb9', '#39ff14']} // Neon blue, purple, green
         particleCount={1000}
-        particleSpread={20}
+        particleSpread={10}
         speed={0.05}
-        particleBaseSize={200}
+        particleBaseSize={100}
         moveParticlesOnHover={false}
         alphaParticles={true}
         disableRotation={false}
         sizeRandomness={0.8}
-        cameraDistance={25}
+        cameraDistance={30}
       />
     </div>
   );
